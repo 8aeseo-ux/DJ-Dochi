@@ -1,0 +1,43 @@
+:root {
+  --color-ink: #09080b;
+  --color-ink-soft: #111016;
+  --color-panel: #15131a;
+  --color-panel-raised: #201c27;
+  --color-panel-light: #2c2635;
+  --color-panel-quiet: rgba(21, 19, 26, 0.65);
+  --color-cream: #f7e9c9;
+  --color-muted: #a69caf;
+  --color-dim: #6e6578;
+  --color-coral: #ff6b55;
+  --color-coral-deep: #b84142;
+  --color-amber: #f5b94c;
+  --color-violet: #8b68ff;
+  --color-mint: #74e0ba;
+  --color-line: rgba(247, 233, 201, 0.14);
+  --color-line-bright: rgba(247, 233, 201, 0.3);
+
+  --font-display: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --space-unit: 0.25rem;
+  --motion-fast: 180ms;
+  --motion-loading: 1.4s;
+
+  /* Compatibility aliases keep existing screen styles focused on semantics. */
+  --ink: var(--color-ink);
+  --ink-soft: var(--color-ink-soft);
+  --panel: var(--color-panel);
+  --panel-raised: var(--color-panel-raised);
+  --panel-light: var(--color-panel-light);
+  --panel-quiet: var(--color-panel-quiet);
+  --cream: var(--color-cream);
+  --muted: var(--color-muted);
+  --dim: var(--color-dim);
+  --coral: var(--color-coral);
+  --coral-deep: var(--color-coral-deep);
+  --amber: var(--color-amber);
+  --violet: var(--color-violet);
+  --mint: var(--color-mint);
+  --line: var(--color-line);
+  --line-bright: var(--color-line-bright);
+}
