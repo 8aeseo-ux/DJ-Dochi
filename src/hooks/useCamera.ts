@@ -80,6 +80,17 @@ export function useCamera(): UseCameraResult {
     return canvas.toDataURL('image/png')
   }, [])
 
+  // The permission request can resolve before the conditional <video> mounts.
+  // Re-attach the already-open stream whenever React commits a new video ref.
+  useEffect(() => {
+    const stream = streamRef.current
+    const video = videoRef.current
+    if (!stream || !video || video.srcObject === stream) return
+
+    video.srcObject = stream
+    void video.play().catch(() => undefined)
+  })
+
   useEffect(() => () => {
     releaseStream(streamRef.current, videoRef.current)
     streamRef.current = null

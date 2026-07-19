@@ -9,6 +9,11 @@ function CameraHarness() {
   return <video ref={cameraApi.videoRef} />
 }
 
+function DelayedVideoHarness({ visible }: { visible: boolean }) {
+  cameraApi = useCamera()
+  return visible ? <video ref={cameraApi.videoRef} /> : null
+}
+
 describe('useCamera', () => {
   const track = { stop: vi.fn() }
   const stream = { getTracks: () => [track] } as unknown as MediaStream
@@ -55,6 +60,22 @@ describe('useCamera', () => {
 
     view.unmount()
     expect(track.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('attaches a stream when the video element mounts after permission resolves', async () => {
+    const view = render(<DelayedVideoHarness visible={false} />)
+
+    await act(async () => {
+      await cameraApi.startCamera()
+    })
+
+    expect(cameraApi.status).toBe('ready')
+    expect(cameraApi.videoRef.current).toBe(null)
+
+    view.rerender(<DelayedVideoHarness visible />)
+    await act(async () => {})
+
+    expect(cameraApi.videoRef.current?.srcObject).toBe(stream)
   })
 
   it('converts camera permission errors into a recoverable error state', async () => {
