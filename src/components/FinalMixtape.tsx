@@ -1,6 +1,7 @@
 import { DUMMY_MIX, DUMMY_TRACKS } from '../data/playlist'
 import { getDochiAsset } from '../lib/dochiAssets'
 import Panel from './Panel'
+import PlatformListenButtons from './PlatformListenButtons'
 import RetroButton from './RetroButton'
 
 type FinalMixtapeProps = {
@@ -64,6 +65,7 @@ export default function FinalMixtape({ open, polaroidUrl = null, onOpen, onClose
             </div>
           ))}
         </div>
+        <PlatformListenButtons tracks={DUMMY_TRACKS} />
         <div className="mixtape-overlay__footer">
           <span>MADE WITH A LITTLE TASTE</span>
           <RetroButton variant="ghost" onClick={onClose}>닫기</RetroButton>
