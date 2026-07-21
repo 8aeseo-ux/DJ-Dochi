@@ -30,10 +30,20 @@ export type PlaylistInput = {
 
 export type PhotoData = string | null
 
+export type MusicPlatform = 'spotify' | 'appleMusic' | 'youtubeMusic'
+
+export type PlatformTrackReference = {
+  id: string | null
+  url: string | null
+}
+
+export type PlatformTrackReferences = Record<MusicPlatform, PlatformTrackReference>
+
 export type Track = {
   title: string
   artist: string
   mood: string
   stat: string
   color: 'coral' | 'amber' | 'violet' | 'mint'
+  platforms: PlatformTrackReferences
 }

@@ -3,6 +3,8 @@ dist/
 .pnpm-store/
 outputs/
 work/
+.worktrees/
+.superpowers/
 *.tsbuildinfo
 .DS_Store
 .env
