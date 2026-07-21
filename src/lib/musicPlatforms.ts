@@ -33,11 +33,41 @@ export const MUSIC_PLATFORM_DEFINITIONS: readonly MusicPlatformDefinition[] = [
   },
 ]
 
+const MUSIC_PLATFORM_HOSTS: Record<MusicPlatform, string> = {
+  spotify: 'open.spotify.com',
+  appleMusic: 'music.apple.com',
+  youtubeMusic: 'music.youtube.com',
+}
+
+const TRACK_ID_PATTERNS: Partial<Record<MusicPlatform, RegExp>> = {
+  spotify: /^[A-Za-z0-9]{22}$/,
+  youtubeMusic: /^[A-Za-z0-9_-]{11}$/,
+}
+
+function getTrimmedValue(value: string | null): string | null {
+  const trimmedValue = value?.trim()
+  return trimmedValue || null
+}
+
+function isValidTrackId(platform: MusicPlatform, trackId: string): boolean {
+  return TRACK_ID_PATTERNS[platform]?.test(trackId) ?? false
+}
+
+function isValidPlatformUrl(platform: MusicPlatform, url: string): boolean {
+  try {
+    const parsedUrl = new URL(url)
+    return parsedUrl.protocol === 'https:' && parsedUrl.hostname === MUSIC_PLATFORM_HOSTS[platform]
+  } catch {
+    return false
+  }
+}
+
 export function buildPlatformTrackUrl(platform: MusicPlatform, trackId: string | null): string | null {
-  if (!trackId) return null
+  const trimmedTrackId = getTrimmedValue(trackId)
+  if (!trimmedTrackId || !isValidTrackId(platform, trimmedTrackId)) return null
 
   const definition = MUSIC_PLATFORM_DEFINITIONS.find((item) => item.id === platform)
-  return definition?.buildTrackUrl?.(trackId) ?? null
+  return definition?.buildTrackUrl?.(trimmedTrackId) ?? null
 }
 
 export function buildPlatformSearchUrl(
@@ -55,9 +85,10 @@ export function resolvePlatformTrackLink(
   track: Track,
 ): { href: string; isDirect: boolean } {
   const reference = track.platforms[platform]
+  const storedUrl = getTrimmedValue(reference.url)
 
-  if (reference.url) {
-    return { href: reference.url, isDirect: true }
+  if (storedUrl && isValidPlatformUrl(platform, storedUrl)) {
+    return { href: storedUrl, isDirect: true }
   }
 
   const trackUrl = buildPlatformTrackUrl(platform, reference.id)
