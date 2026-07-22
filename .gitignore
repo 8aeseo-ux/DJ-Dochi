@@ -5,6 +5,7 @@ outputs/
 work/
 .worktrees/
 .superpowers/
+.vercel/
 *.tsbuildinfo
 .DS_Store
 .env

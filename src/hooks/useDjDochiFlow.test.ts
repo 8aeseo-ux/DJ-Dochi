@@ -1,6 +1,23 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PlaylistAnalysisError } from '../types/playlistAnalysis'
+import { extractPlaylistFromImage } from '../services/playlistAnalysis'
 import { useDjDochiFlow } from './useDjDochiFlow'
+
+vi.mock('../services/playlistAnalysis', () => ({
+  extractPlaylistFromImage: vi.fn(),
+}))
+
+const extractPlaylistMock = vi.mocked(extractPlaylistFromImage)
+
+const EXTRACTION_RESULT = {
+  sourceApp: 'Apple Music',
+  tracks: [
+    { id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '', confidence: 0.96 },
+    { id: 'track-002', title: 'Super Shy', artist: 'NewJeans', album: '', confidence: 0.91 },
+  ],
+  warnings: [],
+}
 
 function advanceToInputChoices(result: { current: ReturnType<typeof useDjDochiFlow> }) {
   act(() => result.current.actions.notice())
@@ -28,6 +45,7 @@ function advanceToPhotoPrompt(result: { current: ReturnType<typeof useDjDochiFlo
 
 describe('useDjDochiFlow', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     const createObjectURL = vi.fn(() => 'blob:dochi-preview')
     vi.stubGlobal('URL', {
       createObjectURL,
@@ -225,5 +243,94 @@ describe('useDjDochiFlow', () => {
 
     expect(result.current.input.imageUrl).toBe(null)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dochi-preview')
+  })
+
+  it('extracts an image before entering the existing handoff flow', async () => {
+    extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+
+    expect(result.current.state).toBe('extracting')
+    expect(result.current.dialogue?.text).toBe('어디 보자.')
+    expect(extractPlaylistMock).toHaveBeenCalledWith(file, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('extractionReview')
+    expect(result.current.extractionResult).toEqual(EXTRACTION_RESULT)
+    expect(result.current.input.imageUrl).toBe(null)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dochi-preview')
+
+    act(() => result.current.actions.confirmExtraction())
+    expect(result.current.state).toBe('receivingInput')
+    expect(result.current.dialogue?.text).toBe('좋아.')
+  })
+
+  it('moves to extractionError and can retry the same image', async () => {
+    extractPlaylistMock
+      .mockRejectedValueOnce(new PlaylistAnalysisError({
+        code: 'ANALYSIS_FAILED',
+        message: '이미지를 읽지 못했어요.',
+        retryable: true,
+      }))
+      .mockResolvedValueOnce(EXTRACTION_RESULT)
+
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.webp', { type: 'image/webp' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('extractionError')
+    expect(result.current.extractionError).toMatchObject({ code: 'ANALYSIS_FAILED' })
+
+    act(() => result.current.actions.retryExtraction())
+    expect(result.current.state).toBe('extracting')
+    await act(async () => { await Promise.resolve() })
+    expect(result.current.state).toBe('extractionReview')
+    expect(extractPlaylistMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('edits, deletes, and manually adds extracted tracks', async () => {
+    extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.jpg', { type: 'image/jpeg' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+    await act(async () => { await Promise.resolve() })
+
+    act(() => result.current.actions.updateExtractedTrack('track-001', 'title', 'Ditto (edited)'))
+    expect(result.current.extractionResult?.tracks[0].title).toBe('Ditto (edited)')
+
+    act(() => result.current.actions.deleteExtractedTrack('track-002'))
+    expect(result.current.extractionResult?.tracks).toHaveLength(1)
+
+    act(() => result.current.actions.addExtractedTrack())
+    expect(result.current.extractionResult?.tracks).toHaveLength(2)
+    expect(result.current.extractionResult?.tracks[1]).toMatchObject({ title: '', artist: '' })
+  })
+
+  it('blocks unsupported image types before extraction', () => {
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.gif', { type: 'image/gif' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+
+    expect(result.current.input.imageFile).toBe(null)
+    expect(result.current.inputError).toMatchObject({ code: 'UNSUPPORTED_IMAGE_TYPE' })
+    expect(extractPlaylistMock).not.toHaveBeenCalled()
   })
 })

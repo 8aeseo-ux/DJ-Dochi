@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
+import { validatePlaylistImage } from '../config/playlistAnalysis'
 import type { SpinFeedbackBand, SpinMetrics } from '../lib/vinylPhysics'
+import { extractPlaylistFromImage } from '../services/playlistAnalysis'
+import { PlaylistAnalysisError } from '../types/playlistAnalysis'
+import type {
+  ExtractedTrack,
+  PlaylistAnalysisIssue,
+  PlaylistExtractionResult,
+} from '../types/playlistAnalysis'
 import type { DochiFlowState, InputMode, PhotoData, PlaylistInput } from '../types'
 
 const CELEBRATION_DURATION_MS = 1_000
@@ -24,6 +32,8 @@ const RETURN_LINES = [
 ] as const
 
 const HANDOFF_LINES = ['좋아.', '이제 같이 믹스를 시작해보자.'] as const
+const EXTRACTION_LINES = ['어디 보자.', '곡 이름부터 읽어볼게.'] as const
+const EXTRACTION_REVIEW_LINES = ['내가 이렇게 읽었어.', '틀린 게 있으면 고쳐줘.'] as const
 const PHOTO_PROMPT_LINES = ['됐다.', '근데 아직 하나 부족해.', '우리 기념사진 하나 찍을래?'] as const
 const FINAL_TAPE_LINES = ['좋아.', '이제 진짜 우리 테이프다.'] as const
 
@@ -34,7 +44,7 @@ const SPIN_REACTIONS: Record<Exclude<SpinFeedbackBand, 'idle'>, readonly string[
   overdrive: ['어어어, 너무 잘 돌리는데?!'],
 }
 
-type DialogueTrack = 'intro' | 'handoff' | 'photoPrompt' | 'finalTape' | 'return' | null
+type DialogueTrack = 'intro' | 'handoff' | 'extracting' | 'extractionReview' | 'photoPrompt' | 'finalTape' | 'return' | null
 
 export type DjDochiFlowActions = {
   notice: () => void
@@ -46,6 +56,13 @@ export type DjDochiFlowActions = {
   deleteInput: () => void
   closeInput: () => void
   handoff: () => void
+  retryExtraction: () => void
+  updateExtractedTrack: (id: string, field: 'title' | 'artist', value: string) => void
+  deleteExtractedTrack: (id: string) => void
+  addExtractedTrack: () => void
+  confirmExtraction: () => void
+  chooseAnotherImage: () => void
+  chooseTextAfterExtraction: () => void
   updateSpinEnergy: (energy: number) => void
   updateSpinMetrics: (metrics: SpinMetrics) => void
   completeSpin: () => void
@@ -67,6 +84,9 @@ export type DjDochiFlow = {
   inputMode: InputMode
   input: PlaylistInput
   hasInput: boolean
+  inputError: PlaylistAnalysisIssue | null
+  extractionResult: PlaylistExtractionResult | null
+  extractionError: PlaylistAnalysisIssue | null
   workMessage: string | null
   spinEnergy: number
   spinIntensity: number
@@ -84,6 +104,8 @@ function createInitialInput(): PlaylistInput {
 function getDialogueLines(track: Exclude<DialogueTrack, null>) {
   if (track === 'intro') return INTRO_LINES
   if (track === 'handoff') return HANDOFF_LINES
+  if (track === 'extracting') return EXTRACTION_LINES
+  if (track === 'extractionReview') return EXTRACTION_REVIEW_LINES
   if (track === 'photoPrompt') return PHOTO_PROMPT_LINES
   if (track === 'finalTape') return FINAL_TAPE_LINES
   return RETURN_LINES
@@ -95,6 +117,9 @@ export function useDjDochiFlow(): DjDochiFlow {
   const [dialogueIndex, setDialogueIndex] = useState(0)
   const [inputMode, setInputMode] = useState<InputMode>(null)
   const [input, setInput] = useState<PlaylistInput>(() => createInitialInput())
+  const [inputError, setInputError] = useState<PlaylistAnalysisIssue | null>(null)
+  const [extractionResult, setExtractionResult] = useState<PlaylistExtractionResult | null>(null)
+  const [extractionError, setExtractionError] = useState<PlaylistAnalysisIssue | null>(null)
   const [spinEnergy, setSpinEnergy] = useState(0)
   const [spinIntensity, setSpinIntensity] = useState(0)
   const [spinReaction, setSpinReaction] = useState<string | null>(null)
@@ -105,6 +130,8 @@ export function useDjDochiFlow(): DjDochiFlow {
   const reactionBandRef = useRef<SpinFeedbackBand>('idle')
   const reactionVariantRef = useRef(0)
   const overdriveTimerRef = useRef<number | null>(null)
+  const extractionControllerRef = useRef<AbortController | null>(null)
+  const manualTrackIdRef = useRef(0)
 
   inputRef.current = input
 
@@ -114,7 +141,7 @@ export function useDjDochiFlow(): DjDochiFlow {
   }
 
   const resetInput = () => replaceInput(createInitialInput())
-  const hasInput = Boolean(input.imageUrl || input.pastedText.trim())
+  const hasInput = Boolean(input.imageFile || input.pastedText.trim())
   const dialogueLines = dialogueTrack ? getDialogueLines(dialogueTrack) : null
   const dialogue = dialogueLines
     ? {
@@ -125,7 +152,9 @@ export function useDjDochiFlow(): DjDochiFlow {
       }
     : null
   const dialogueKey = dialogueTrack ? `${dialogueTrack}-${dialogueIndex}` : 'none'
-  const workMessage = state === 'working'
+  const workMessage = state === 'extracting'
+    ? 'READING TRACKS...'
+    : state === 'working'
     ? 'SPIN TO CHARGE'
     : state === 'recordingIntro'
       ? 'MIX ENERGY / LOCKED'
@@ -134,6 +163,54 @@ export function useDjDochiFlow(): DjDochiFlow {
         : state === 'recording'
           ? 'REC / Recording...'
           : null
+
+  const beginExtraction = (file: File) => {
+    extractionControllerRef.current?.abort()
+    const controller = new AbortController()
+    extractionControllerRef.current = controller
+    setExtractionResult(null)
+    setExtractionError(null)
+    setDialogueTrack('extracting')
+    setDialogueIndex(0)
+    setState('extracting')
+
+    void extractPlaylistFromImage(file, { signal: controller.signal })
+      .then((result) => {
+        if (extractionControllerRef.current !== controller || controller.signal.aborted) return
+        extractionControllerRef.current = null
+        setExtractionResult(result)
+        setDialogueTrack('extractionReview')
+        setDialogueIndex(0)
+        setState('extractionReview')
+      })
+      .catch((error: unknown) => {
+        if (extractionControllerRef.current !== controller || controller.signal.aborted) return
+        extractionControllerRef.current = null
+        const issue: PlaylistAnalysisIssue = error instanceof PlaylistAnalysisError
+          ? { code: error.code, message: error.message, retryable: error.retryable }
+          : {
+              code: 'ANALYSIS_FAILED',
+              message: '이미지를 분석하지 못했어요. 다시 시도해주세요.',
+              retryable: true,
+            }
+        setExtractionError(issue)
+        setDialogueTrack(null)
+        setState('extractionError')
+      })
+  }
+
+  const returnToInput = (mode: Exclude<InputMode, null>) => {
+    extractionControllerRef.current?.abort()
+    extractionControllerRef.current = null
+    resetInput()
+    setInputError(null)
+    setExtractionResult(null)
+    setExtractionError(null)
+    setDialogueTrack(null)
+    setDialogueIndex(0)
+    setInputMode(mode)
+    setState('choosingInput')
+  }
 
   const actions: DjDochiFlowActions = {
     notice: () => {
@@ -162,15 +239,22 @@ export function useDjDochiFlow(): DjDochiFlow {
     chooseImage: () => {
       if (state !== 'choosingInput') return
       resetInput()
+      setInputError(null)
       setInputMode('image')
     },
     chooseText: () => {
       if (state !== 'choosingInput') return
       resetInput()
+      setInputError(null)
       setInputMode('text')
     },
     selectImage: (file) => {
-      if (!file.type.startsWith('image/')) return
+      const issue = validatePlaylistImage(file)
+      if (issue) {
+        setInputError(issue)
+        return
+      }
+      setInputError(null)
       replaceInput({ imageFile: file, imageUrl: URL.createObjectURL(file), pastedText: '' })
       setInputMode('image')
     },
@@ -179,20 +263,78 @@ export function useDjDochiFlow(): DjDochiFlow {
     },
     deleteInput: () => {
       resetInput()
+      setInputError(null)
       setInputMode(null)
     },
     closeInput: () => {
       resetInput()
+      setInputError(null)
       setInputMode(null)
     },
     handoff: () => {
-      const nextHasInput = Boolean(inputRef.current.imageUrl || inputRef.current.pastedText.trim())
+      const currentInput = inputRef.current
+      const nextHasInput = Boolean(currentInput.imageFile || currentInput.pastedText.trim())
       if (!nextHasInput || state !== 'choosingInput') return
       setInputMode(null)
+
+      if (currentInput.imageFile) {
+        replaceInput({ ...currentInput, imageUrl: null })
+        beginExtraction(currentInput.imageFile)
+        return
+      }
+
       setDialogueTrack('handoff')
       setDialogueIndex(0)
       setState('receivingInput')
     },
+    retryExtraction: () => {
+      if (state !== 'extractionReview' && state !== 'extractionError') return
+      const file = inputRef.current.imageFile
+      if (!file) returnToInput('image')
+      else beginExtraction(file)
+    },
+    updateExtractedTrack: (id, field, value) => {
+      if (state !== 'extractionReview') return
+      setExtractionResult((current) => current ? {
+        ...current,
+        tracks: current.tracks.map((track) => track.id === id ? { ...track, [field]: value } : track),
+      } : current)
+    },
+    deleteExtractedTrack: (id) => {
+      if (state !== 'extractionReview') return
+      setExtractionResult((current) => current ? {
+        ...current,
+        tracks: current.tracks.filter((track) => track.id !== id),
+      } : current)
+    },
+    addExtractedTrack: () => {
+      if (state !== 'extractionReview') return
+      manualTrackIdRef.current += 1
+      const track: ExtractedTrack = {
+        id: `manual-${manualTrackIdRef.current}`,
+        title: '',
+        artist: '',
+        album: '',
+        confidence: 1,
+      }
+      setExtractionResult((current) => current ? { ...current, tracks: [...current.tracks, track] } : current)
+    },
+    confirmExtraction: () => {
+      if (state !== 'extractionReview' || !extractionResult) return
+      const tracks = extractionResult.tracks.map((track) => ({
+        ...track,
+        title: track.title.trim(),
+        artist: track.artist.trim(),
+      }))
+      if (tracks.length === 0 || tracks.some((track) => !track.title || !track.artist)) return
+      setExtractionResult({ ...extractionResult, tracks })
+      resetInput()
+      setDialogueTrack('handoff')
+      setDialogueIndex(0)
+      setState('receivingInput')
+    },
+    chooseAnotherImage: () => returnToInput('image'),
+    chooseTextAfterExtraction: () => returnToInput('text'),
     updateSpinEnergy: (energy) => {
       if (state !== 'working') return
       setSpinEnergy(Math.min(1, Math.max(0, energy)))
@@ -271,8 +413,13 @@ export function useDjDochiFlow(): DjDochiFlow {
       if (state === 'viewingTape') setState('finalTape')
     },
     restart: () => {
+      extractionControllerRef.current?.abort()
+      extractionControllerRef.current = null
       resetInput()
       setInputMode(null)
+      setInputError(null)
+      setExtractionResult(null)
+      setExtractionError(null)
       setDialogueTrack(null)
       setDialogueIndex(0)
       setSpinEnergy(0)
@@ -324,6 +471,7 @@ export function useDjDochiFlow(): DjDochiFlow {
 
   useEffect(() => () => {
     if (overdriveTimerRef.current !== null) window.clearTimeout(overdriveTimerRef.current)
+    extractionControllerRef.current?.abort()
   }, [])
 
   useEffect(() => {
@@ -345,6 +493,9 @@ export function useDjDochiFlow(): DjDochiFlow {
     inputMode,
     input,
     hasInput,
+    inputError,
+    extractionResult,
+    extractionError,
     workMessage,
     spinEnergy,
     spinIntensity,

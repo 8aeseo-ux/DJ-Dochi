@@ -8,11 +8,14 @@ import DochiCharacter from './DochiCharacter'
 import DjController from './DjController'
 import Equalizer from './Equalizer'
 import FinalMixtape from './FinalMixtape'
+import Panel from './Panel'
 import PlaylistInputPanel from './PlaylistInputPanel'
+import PlaylistExtractionReview from './PlaylistExtractionReview'
 import PhotoReview from './PhotoReview'
 import PolaroidComposer from './PolaroidComposer'
 import VinylInteraction from './VinylInteraction'
 import WorkshopEffects from './WorkshopEffects'
+import RetroButton from './RetroButton'
 
 type DochiRoomProps = {
   flow: DjDochiFlow
@@ -50,6 +53,9 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     inputMode,
     input,
     hasInput,
+    inputError,
+    extractionResult,
+    extractionError,
     workMessage,
     spinEnergy,
     spinIntensity,
@@ -63,6 +69,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     || state === 'recordingIntro'
     || state === 'needleDropping'
     || state === 'recording'
+  const isExtracting = state === 'extracting'
   const isRecording = state === 'recording'
   const vinylPhase = state === 'needleDropping' ? 'needle' : isRecording ? 'recording' : 'spin'
   const isTapeAvailable = state === 'finalTape' || state === 'givingTape' || state === 'viewingTape'
@@ -101,7 +108,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
           </section>
 
           <WorkshopEffects
-            active={isMixing}
+            active={isMixing || isExtracting}
             message={workMessage}
             energy={spinEnergy}
             intensity={spinIntensity}
@@ -159,12 +166,48 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
               mode={inputMode}
               input={input}
               hasInput={hasInput}
+              inputError={inputError?.message}
               onImageSelect={actions.selectImage}
               onTextChange={actions.updateText}
               onHandoff={actions.handoff}
               onDelete={actions.deleteInput}
               onClose={actions.closeInput}
             />
+          )}
+
+          {state === 'extracting' && (
+            <Panel className="playlist-extraction-status" role="status" aria-label="플레이리스트 이미지 분석 중">
+              <span className="screen-eyebrow">DOCHI VISION / READING</span>
+              <div className="playlist-extraction-status__scan" aria-hidden="true"><i /><i /><i /></div>
+              <strong>곡 이름부터 읽어보는 중...</strong>
+              <p>화면 속에 보이는 정보만 확인하고 있어요.</p>
+            </Panel>
+          )}
+
+          {state === 'extractionReview' && extractionResult && (
+            <PlaylistExtractionReview
+              result={extractionResult}
+              onTrackChange={actions.updateExtractedTrack}
+              onDeleteTrack={actions.deleteExtractedTrack}
+              onAddTrack={actions.addExtractedTrack}
+              onRetry={actions.retryExtraction}
+              onConfirm={actions.confirmExtraction}
+              onChooseImage={actions.chooseAnotherImage}
+              onChooseText={actions.chooseTextAfterExtraction}
+            />
+          )}
+
+          {state === 'extractionError' && extractionError && (
+            <Panel className="playlist-extraction-error" role="alert" aria-label="플레이리스트 분석 오류">
+              <span className="screen-eyebrow">DOCHI VISION / ERROR</span>
+              <h2>이미지를 읽지 못했어.</h2>
+              <p>{extractionError.message}</p>
+              <div className="playlist-extraction-error__actions">
+                {extractionError.retryable && <RetroButton onClick={actions.retryExtraction}>다시 분석하기</RetroButton>}
+                <RetroButton variant="ghost" onClick={actions.chooseAnotherImage}>다른 이미지 선택</RetroButton>
+                <RetroButton variant="ghost" onClick={actions.chooseTextAfterExtraction}>음악 목록 붙여넣기</RetroButton>
+              </div>
+            </Panel>
           )}
 
           {isPhotoPromptChoice && (
@@ -214,7 +257,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             />
           )}
 
-          <div className="room-footer" aria-hidden="true"><span>PLAYLIST TASTE LAB</span><span>NO API / NO OCR / LOCAL PROTOTYPE</span></div>
+          <div className="room-footer" aria-hidden="true"><span>PLAYLIST TASTE LAB</span><span>VISION BETA / PRIVATE SESSION</span></div>
         </main>
       </div>
     </div>
