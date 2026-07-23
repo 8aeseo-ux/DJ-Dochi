@@ -1,8 +1,6 @@
 import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
 import {
-  MixtapeResultSchema,
   type ConfirmedTrack,
-  type MixtapeResult,
   type TasteProfile,
 } from '../../src/types/mixtape'
 import type { LlmMixtapeDraft } from '../../src/services/llm/types'
@@ -11,14 +9,6 @@ import { trackIdentityKey } from '../catalog/trackIdentity'
 
 function normalize(value: string) {
   return value.trim()
-}
-
-function emptyPlatformReferences() {
-  return {
-    spotify: { id: null, url: null },
-    appleMusic: { id: null, url: null },
-    youtubeMusic: { id: null, url: null },
-  }
 }
 
 export type NormalizedMixtapeDraftCandidates = {
@@ -79,34 +69,4 @@ export function normalizeMixtapeDraftCandidates(
     },
     candidates,
   }
-}
-
-export function normalizeMixtapeDraft(
-  draft: LlmMixtapeDraft,
-  confirmedTracks: readonly ConfirmedTrack[],
-): MixtapeResult {
-  const normalized = normalizeMixtapeDraftCandidates(draft, confirmedTracks)
-  const result = {
-    tasteProfile: normalized.tasteProfile,
-    mixtape: {
-      ...normalized.metadata,
-      tracks: normalized.candidates.map((track, index) => ({
-        ...track,
-        id: `recommendation-${String(index + 1).padStart(3, '0')}`,
-        catalogStatus: 'unverified' as const,
-        platforms: emptyPlatformReferences(),
-      })),
-    },
-  }
-
-  const parsed = MixtapeResultSchema.safeParse(result)
-  if (!parsed.success) {
-    throw new MixtapeAnalysisError({
-      code: 'INVALID_RESPONSE',
-      message: '취향 분석 결과 형식을 확인할 수 없어요. 다시 시도해주세요.',
-      retryable: true,
-    }, { cause: parsed.error })
-  }
-
-  return parsed.data
 }
