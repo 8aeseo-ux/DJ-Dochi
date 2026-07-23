@@ -49,7 +49,10 @@ describe('createOpenAiVisionExtractor', () => {
           message: '지금은 이미지를 읽을 수 없어요.',
           retryable: true,
         },
-      }), { status: 502 })),
+      }), {
+        status: 502,
+        headers: { 'Content-Type': 'application/json' },
+      })),
     })
 
     await expect(extractor.extract(
@@ -57,6 +60,45 @@ describe('createOpenAiVisionExtractor', () => {
     )).rejects.toMatchObject({
       code: 'ANALYSIS_FAILED',
       message: '지금은 이미지를 읽을 수 없어요.',
+      retryable: true,
+    })
+  })
+
+  it('maps a JSON origin rejection without falling through to a parse error', async () => {
+    const extractor = createOpenAiVisionExtractor({
+      fetchImpl: vi.fn(async () => new Response(JSON.stringify({
+        error: {
+          code: 'ORIGIN_NOT_ALLOWED',
+          message: '허용되지 않은 요청 출처입니다.',
+          retryable: false,
+        },
+      }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' },
+      })),
+    })
+
+    await expect(extractor.extract(
+      new File(['playlist'], 'playlist.png', { type: 'image/png' }),
+    )).rejects.toMatchObject({
+      code: 'ORIGIN_NOT_ALLOWED',
+      message: '허용되지 않은 요청 출처입니다.',
+      retryable: false,
+    })
+  })
+
+  it('does not parse a non-JSON error response as JSON', async () => {
+    const extractor = createOpenAiVisionExtractor({
+      fetchImpl: vi.fn(async () => new Response('<html>Service unavailable</html>', {
+        status: 503,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })),
+    })
+
+    await expect(extractor.extract(
+      new File(['playlist'], 'playlist.png', { type: 'image/png' }),
+    )).rejects.toMatchObject({
+      code: 'ANALYSIS_FAILED',
       retryable: true,
     })
   })

@@ -37,7 +37,11 @@ function isFile(value: FormDataEntryValue | null): value is File {
 export default {
   async fetch(request: Request): Promise<Response> {
     if (!isAllowedBrowserOrigin(request)) {
-      return new Response(null, { status: 403 })
+      return errorResponse({
+        code: 'ORIGIN_NOT_ALLOWED',
+        message: '허용되지 않은 요청 출처입니다.',
+        retryable: false,
+      }, 403)
     }
 
     if (request.method === 'OPTIONS') {
@@ -89,8 +93,17 @@ export default {
       }, 503)
     }
 
+    const model = process.env.OPENAI_VISION_MODEL?.trim()
+    if (!model) {
+      return errorResponse({
+        code: 'MISSING_MODEL',
+        message: '이미지 분석 모델이 아직 설정되지 않았어요.',
+        retryable: false,
+      }, 503)
+    }
+
     try {
-      const result = await extractPlaylistWithOpenAI(image, apiKey)
+      const result = await extractPlaylistWithOpenAI(image, apiKey, model)
       return json(result)
     } catch (error) {
       const issue: PlaylistAnalysisIssue = error instanceof PlaylistAnalysisError

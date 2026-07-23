@@ -29,6 +29,8 @@ export type PlaylistAnalysisErrorCode =
   | 'INVALID_RESPONSE'
   | 'MISSING_IMAGE'
   | 'MISSING_API_KEY'
+  | 'MISSING_MODEL'
+  | 'ORIGIN_NOT_ALLOWED'
   | 'ANALYSIS_FAILED'
 
 export type PlaylistAnalysisIssue = {

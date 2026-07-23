@@ -24,6 +24,8 @@ const ApiErrorSchema = z.object({
       'INVALID_RESPONSE',
       'MISSING_IMAGE',
       'MISSING_API_KEY',
+      'MISSING_MODEL',
+      'ORIGIN_NOT_ALLOWED',
       'ANALYSIS_FAILED',
     ]),
     message: z.string(),
@@ -69,6 +71,39 @@ export function createOpenAiVisionExtractor(
           signal: controller.signal,
         })
 
+        const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+        const isJsonResponse = contentType.includes('application/json')
+
+        if (!response.ok) {
+          if (isJsonResponse) {
+            let errorPayload: unknown
+            try {
+              errorPayload = await response.json()
+            } catch {
+              errorPayload = null
+            }
+
+            const parsedError = ApiErrorSchema.safeParse(errorPayload)
+            if (parsedError.success) {
+              throw new PlaylistAnalysisError(parsedError.data.error)
+            }
+          }
+
+          throw new PlaylistAnalysisError({
+            code: 'ANALYSIS_FAILED',
+            message: '이미지를 분석하지 못했어요. 잠시 후 다시 시도해주세요.',
+            retryable: true,
+          })
+        }
+
+        if (!isJsonResponse) {
+          throw new PlaylistAnalysisError({
+            code: 'INVALID_RESPONSE',
+            message: '서버 응답을 확인할 수 없어요. 다시 시도해주세요.',
+            retryable: true,
+          })
+        }
+
         let payload: unknown
         try {
           payload = await response.json()
@@ -78,19 +113,6 @@ export function createOpenAiVisionExtractor(
             message: '서버 응답을 확인할 수 없어요. 다시 시도해주세요.',
             retryable: true,
           }, { cause: error })
-        }
-
-        if (!response.ok) {
-          const parsedError = ApiErrorSchema.safeParse(payload)
-          if (parsedError.success) {
-            throw new PlaylistAnalysisError(parsedError.data.error)
-          }
-
-          throw new PlaylistAnalysisError({
-            code: 'ANALYSIS_FAILED',
-            message: '이미지를 분석하지 못했어요. 잠시 후 다시 시도해주세요.',
-            retryable: true,
-          })
         }
 
         return parsePlaylistExtractionResult(payload)

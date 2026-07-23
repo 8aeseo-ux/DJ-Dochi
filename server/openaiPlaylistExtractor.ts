@@ -4,7 +4,6 @@ import { z } from 'zod'
 import { PlaylistAnalysisError } from '../src/types/playlistAnalysis.js'
 import type { PlaylistExtractionResult } from '../src/types/playlistAnalysis.js'
 
-const OPENAI_PLAYLIST_MODEL = 'gpt-5.6-luna'
 const INCOMPLETE_TRACK_WARNING = '곡명과 아티스트를 모두 확인할 수 없는 항목은 제외했어요.'
 
 const RawTrackSchema = z.object({
@@ -78,14 +77,18 @@ export function normalizeExtractionResult(raw: RawExtraction): PlaylistExtractio
   }
 }
 
-export async function extractPlaylistWithOpenAI(file: File, apiKey: string): Promise<PlaylistExtractionResult> {
+export async function extractPlaylistWithOpenAI(
+  file: File,
+  apiKey: string,
+  model: string,
+): Promise<PlaylistExtractionResult> {
   const imageBytes = Buffer.from(await file.arrayBuffer())
   const imageUrl = `data:${file.type};base64,${imageBytes.toString('base64')}`
   const client = new OpenAI({ apiKey, timeout: 40_000, maxRetries: 1 })
 
   try {
     const response = await client.responses.parse({
-      model: OPENAI_PLAYLIST_MODEL,
+      model,
       store: false,
       reasoning: { effort: 'low' },
       input: [

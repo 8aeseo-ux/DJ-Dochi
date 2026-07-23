@@ -31,11 +31,17 @@ describe('POST /api/extract-playlist', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.OPENAI_API_KEY = 'test-api-key'
+    process.env.OPENAI_VISION_MODEL = 'test-vision-model'
+    process.env.VERCEL_URL = 'react-vite-typescript-tailwindcss-dj-abc123.vercel.app'
+    process.env.VERCEL_BRANCH_URL = 'react-vite-typescript-tailwindcss-dj-hog-git-feature-8aeseo-1193s-projects.vercel.app'
     extractWithOpenAIMock.mockResolvedValue(RESULT)
   })
 
   afterEach(() => {
     delete process.env.OPENAI_API_KEY
+    delete process.env.OPENAI_VISION_MODEL
+    delete process.env.VERCEL_URL
+    delete process.env.VERCEL_BRANCH_URL
   })
 
   it('accepts CORS preflight requests without calling OpenAI', async () => {
@@ -45,14 +51,46 @@ describe('POST /api/extract-playlist', () => {
     expect(extractWithOpenAIMock).not.toHaveBeenCalled()
   })
 
-  it('accepts both Dothome origins and rejects foreign origins', async () => {
+  it('accepts Dothome and project-owned Vercel origins', async () => {
     const secureRequest = createRequest(undefined, 'OPTIONS')
     secureRequest.headers.set('Origin', 'https://qotjdus1016.dothome.co.kr')
-    const foreignRequest = createRequest(undefined, 'OPTIONS')
-    foreignRequest.headers.set('Origin', 'https://example.com')
+    const productionRequest = createRequest(undefined, 'OPTIONS')
+    productionRequest.headers.set(
+      'Origin',
+      'https://react-vite-typescript-tailwindcss-d.vercel.app',
+    )
+    const previewRequest = createRequest(undefined, 'OPTIONS')
+    previewRequest.headers.set(
+      'Origin',
+      'https://react-vite-typescript-tailwindcss-dj-abc123.vercel.app',
+    )
+    const projectAliasRequest = createRequest(undefined, 'OPTIONS')
+    projectAliasRequest.headers.set(
+      'Origin',
+      'https://react-vite-typescript-tailwindcss-dj-hog-git-feature-8aeseo-1193s-projects.vercel.app',
+    )
 
     await expect(handler.fetch(secureRequest)).resolves.toMatchObject({ status: 204 })
-    await expect(handler.fetch(foreignRequest)).resolves.toMatchObject({ status: 403 })
+    await expect(handler.fetch(productionRequest)).resolves.toMatchObject({ status: 204 })
+    await expect(handler.fetch(previewRequest)).resolves.toMatchObject({ status: 204 })
+    await expect(handler.fetch(projectAliasRequest)).resolves.toMatchObject({ status: 204 })
+  })
+
+  it('returns a structured JSON 403 for foreign origins', async () => {
+    const foreignRequest = createRequest(undefined, 'OPTIONS')
+    foreignRequest.headers.set('Origin', 'https://unrelated-project.vercel.app')
+
+    const response = await handler.fetch(foreignRequest)
+
+    expect(response.status).toBe(403)
+    expect(response.headers.get('content-type')).toContain('application/json')
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: 'ORIGIN_NOT_ALLOWED',
+        message: '허용되지 않은 요청 출처입니다.',
+        retryable: false,
+      },
+    })
   })
 
   it('rejects non-POST requests', async () => {
@@ -92,15 +130,27 @@ describe('POST /api/extract-playlist', () => {
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'MISSING_API_KEY' } })
   })
 
+  it('requires a server-side Vision model', async () => {
+    delete process.env.OPENAI_VISION_MODEL
+    const response = await handler.fetch(createRequest(
+      new File(['png'], 'playlist.png', { type: 'image/png' }),
+    ))
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'MISSING_MODEL' } })
+    expect(extractWithOpenAIMock).not.toHaveBeenCalled()
+  })
+
   it('returns the structured extraction result', async () => {
     const file = new File(['png'], 'playlist.png', { type: 'image/png' })
     const response = await handler.fetch(createRequest(file))
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual(RESULT)
-    const [receivedFile, receivedApiKey] = extractWithOpenAIMock.mock.calls[0]
+    const [receivedFile, receivedApiKey, receivedModel] = extractWithOpenAIMock.mock.calls[0]
     expect(receivedFile).toMatchObject({ name: file.name, type: file.type, size: file.size })
     expect(receivedApiKey).toBe('test-api-key')
+    expect(receivedModel).toBe('test-vision-model')
   })
 
   it('returns a structured retryable error when analysis fails', async () => {
