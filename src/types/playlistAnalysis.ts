@@ -20,6 +20,10 @@ export type PlaylistExtractionResult = z.infer<typeof PlaylistExtractionResultSc
 export type PlaylistAnalysisErrorCode =
   | 'UNSUPPORTED_IMAGE_TYPE'
   | 'IMAGE_TOO_LARGE'
+  | 'OCR_ENGINE_FAILED'
+  | 'OCR_RECOGNITION_FAILED'
+  | 'NO_TRACKS_FOUND'
+  | 'PROVIDER_UNAVAILABLE'
   | 'REQUEST_TIMEOUT'
   | 'NETWORK_ERROR'
   | 'INVALID_RESPONSE'
