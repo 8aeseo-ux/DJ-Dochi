@@ -3,10 +3,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_PLAYLIST_IMAGE_BYTES } from '../src/config/playlistAnalysis'
 import { PlaylistAnalysisError } from '../src/types/playlistAnalysis'
-import { extractPlaylistWithOpenAI } from './openaiPlaylistExtractor'
+import { extractPlaylistWithOpenAI } from '../server/openaiPlaylistExtractor'
 import handler from './extract-playlist'
 
-vi.mock('./openaiPlaylistExtractor', () => ({
+vi.mock('../server/openaiPlaylistExtractor', () => ({
   extractPlaylistWithOpenAI: vi.fn(),
 }))
 

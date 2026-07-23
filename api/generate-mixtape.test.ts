@@ -11,35 +11,35 @@ import type {
   CatalogCandidateCollection,
   CatalogPoolTrack,
   CatalogSearchPlan,
-} from './catalog/types'
-import { createLlmProvider } from './llm/provider'
-import { buildCatalogSearchPlan } from './catalog/buildCatalogSearchPlan'
-import { collectCatalogCandidates } from './catalog/collectCatalogCandidates'
-import { shortlistCatalogCandidates } from './catalog/rankCatalogCandidates'
-import { assembleVerifiedMixtape } from './catalog/assembleVerifiedMixtape'
-import { createItunesCatalogProvider } from './catalog/itunesCatalogProvider'
-import { createMusicBrainzCatalogProvider } from './catalog/musicBrainzCatalogProvider'
+} from '../server/catalog/types'
+import { createLlmProvider } from '../server/llm/provider'
+import { buildCatalogSearchPlan } from '../server/catalog/buildCatalogSearchPlan'
+import { collectCatalogCandidates } from '../server/catalog/collectCatalogCandidates'
+import { shortlistCatalogCandidates } from '../server/catalog/rankCatalogCandidates'
+import { assembleVerifiedMixtape } from '../server/catalog/assembleVerifiedMixtape'
+import { createItunesCatalogProvider } from '../server/catalog/itunesCatalogProvider'
+import { createMusicBrainzCatalogProvider } from '../server/catalog/musicBrainzCatalogProvider'
 import handler from './generate-mixtape'
 
-vi.mock('./llm/provider', () => ({
+vi.mock('../server/llm/provider', () => ({
   createLlmProvider: vi.fn(),
 }))
-vi.mock('./catalog/buildCatalogSearchPlan', () => ({
+vi.mock('../server/catalog/buildCatalogSearchPlan', () => ({
   buildCatalogSearchPlan: vi.fn(),
 }))
-vi.mock('./catalog/collectCatalogCandidates', () => ({
+vi.mock('../server/catalog/collectCatalogCandidates', () => ({
   collectCatalogCandidates: vi.fn(),
 }))
-vi.mock('./catalog/rankCatalogCandidates', () => ({
+vi.mock('../server/catalog/rankCatalogCandidates', () => ({
   shortlistCatalogCandidates: vi.fn(),
 }))
-vi.mock('./catalog/assembleVerifiedMixtape', () => ({
+vi.mock('../server/catalog/assembleVerifiedMixtape', () => ({
   assembleVerifiedMixtape: vi.fn(),
 }))
-vi.mock('./catalog/itunesCatalogProvider', () => ({
+vi.mock('../server/catalog/itunesCatalogProvider', () => ({
   createItunesCatalogProvider: vi.fn(),
 }))
-vi.mock('./catalog/musicBrainzCatalogProvider', () => ({
+vi.mock('../server/catalog/musicBrainzCatalogProvider', () => ({
   createMusicBrainzCatalogProvider: vi.fn(),
 }))
 

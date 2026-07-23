@@ -1,7 +1,7 @@
 import { validatePlaylistImage } from '../src/config/playlistAnalysis'
 import { PlaylistAnalysisError } from '../src/types/playlistAnalysis'
 import type { PlaylistAnalysisIssue } from '../src/types/playlistAnalysis'
-import { extractPlaylistWithOpenAI } from './openaiPlaylistExtractor'
+import { extractPlaylistWithOpenAI } from '../server/openaiPlaylistExtractor'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
