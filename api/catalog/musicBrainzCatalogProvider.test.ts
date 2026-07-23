@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CatalogCandidate } from './types'
+import type { CatalogCandidate, CatalogSearchSeed } from './types'
 import { createMusicBrainzCatalogProvider } from './musicBrainzCatalogProvider'
 
 const CANDIDATE: CatalogCandidate = {
@@ -9,6 +9,21 @@ const CANDIDATE: CatalogCandidate = {
   artist: 'NewJeans',
   album: '',
   reason: '몽환적인 결이 이어져.',
+}
+
+const GENRE_SEED: CatalogSearchSeed = {
+  id: 'genre-1',
+  kind: 'genre',
+  term: 'dream pop',
+  weight: 1,
+}
+
+const ARTIST_SEED: CatalogSearchSeed = {
+  id: 'input-artist-1',
+  kind: 'input_artist',
+  term: 'Beach House',
+  weight: 0.8,
+  sourceArtist: 'Beach House',
 }
 
 function musicBrainzResponse(recordings: unknown[], status = 200): Response {
@@ -25,6 +40,8 @@ function recording(overrides: Record<string, unknown> = {}) {
     length: 185507,
     'artist-credit': [{ name: 'NewJeans' }],
     releases: [{ title: 'NewJeans 1st Single OMG' }],
+    score: 96,
+    tags: [{ name: 'dream pop', count: 8 }],
     ...overrides,
   }
 }
@@ -34,6 +51,116 @@ afterEach(() => {
 })
 
 describe('createMusicBrainzCatalogProvider', () => {
+  it('discovers official recordings by tag with normalized provider scores', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      musicBrainzResponse([recording()]),
+    )
+    const provider = createMusicBrainzCatalogProvider({
+      fetch: fetchMock,
+      minIntervalMs: 0,
+    })
+
+    await expect(provider.search(GENRE_SEED)).resolves.toEqual({
+      status: 'ok',
+      tracks: [{
+        provider: 'musicbrainz',
+        catalogId: 'f4a0d0d2-b6be-4ffe-8a86-8d6168839056',
+        title: 'Ditto',
+        artist: 'NewJeans',
+        album: 'NewJeans 1st Single OMG',
+        url: 'https://musicbrainz.org/recording/f4a0d0d2-b6be-4ffe-8a86-8d6168839056',
+        durationMs: 185507,
+        primaryGenre: 'dream pop',
+        providerScore: 0.96,
+      }],
+    })
+
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(requestedUrl.searchParams.get('query')).toBe(
+      'tag:"dream pop" AND status:official',
+    )
+    expect(requestedUrl.searchParams.get('limit')).toBe('25')
+  })
+
+  it('uses an exact artist recording query for confirmed-artist seeds', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      musicBrainzResponse([recording()]),
+    )
+    const provider = createMusicBrainzCatalogProvider({
+      fetch: fetchMock,
+      minIntervalMs: 0,
+    })
+
+    await provider.search(ARTIST_SEED)
+
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(requestedUrl.searchParams.get('query')).toBe(
+      'artist:"Beach House" AND status:official',
+    )
+  })
+
+  it('creates a similar-artist seed only from exact names and overlapping catalog tags', async () => {
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        artists: [{
+          id: 'artist-beach-house',
+          name: 'Beach House',
+          score: 100,
+          aliases: [{ name: 'Beach House' }],
+          tags: [{ name: 'dream pop', count: 10 }],
+        }],
+      })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        artists: [{
+          id: 'artist-cocteau-twins',
+          name: 'Cocteau Twins',
+          score: 98,
+          tags: [{ name: 'dream pop', count: 8 }],
+        }],
+      })))
+    const provider = createMusicBrainzCatalogProvider({
+      fetch: fetchMock,
+      minIntervalMs: 0,
+    })
+
+    await expect(provider.findSimilarArtistSeed('Beach House')).resolves.toEqual({
+      id: 'similar-artist-artist-cocteau-twins',
+      kind: 'similar_artist',
+      term: 'Cocteau Twins',
+      weight: 0.76,
+      sourceArtist: 'Beach House',
+      catalogEvidence: {
+        provider: 'musicbrainz',
+        entityId: 'artist-cocteau-twins',
+        tag: 'dream pop',
+      },
+    })
+
+    const firstUrl = new URL(String(fetchMock.mock.calls[0][0]))
+    const secondUrl = new URL(String(fetchMock.mock.calls[1][0]))
+    expect(firstUrl.pathname).toBe('/ws/2/artist')
+    expect(firstUrl.searchParams.get('query')).toBe('artist:"Beach House"')
+    expect(secondUrl.searchParams.get('query')).toBe('tag:"dream pop"')
+  })
+
+  it('skips similar-artist expansion when the exact artist has no catalog tags', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({
+      artists: [{
+        id: 'artist-beach-house',
+        name: 'Beach House',
+        score: 100,
+        tags: [],
+      }],
+    })))
+    const provider = createMusicBrainzCatalogProvider({
+      fetch: fetchMock,
+      minIntervalMs: 0,
+    })
+
+    await expect(provider.findSimilarArtistSeed('Beach House')).resolves.toBeNull()
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
   it('searches recordings with a meaningful user agent and maps canonical metadata', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
       musicBrainzResponse([recording()]),

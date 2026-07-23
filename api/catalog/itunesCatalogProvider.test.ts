@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CatalogCandidate } from './types'
+import type { CatalogCandidate, CatalogSearchSeed } from './types'
 import { createItunesCatalogProvider } from './itunesCatalogProvider'
 
 const CANDIDATE: CatalogCandidate = {
@@ -9,6 +9,13 @@ const CANDIDATE: CatalogCandidate = {
   artist: 'NewJeans',
   album: '',
   reason: '몽환적인 결이 이어져.',
+}
+
+const GENRE_SEED: CatalogSearchSeed = {
+  id: 'genre-1',
+  kind: 'genre',
+  term: 'dream pop',
+  weight: 1,
 }
 
 function itunesResponse(results: unknown[], status = 200): Response {
@@ -28,6 +35,7 @@ function song(overrides: Record<string, unknown> = {}) {
     trackTimeMillis: 185507,
     collectionName: 'NewJeans 1st Single OMG',
     trackViewUrl: 'https://music.apple.com/kr/album/ditto/1659513440?i=1659513441',
+    primaryGenreName: 'K-Pop',
     ...overrides,
   }
 }
@@ -37,6 +45,55 @@ afterEach(() => {
 })
 
 describe('createItunesCatalogProvider', () => {
+  it('discovers canonical songs for a bounded catalog search seed', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(itunesResponse([
+      song(),
+      song({
+        trackId: 2,
+        trackName: 'Hype Boy',
+        collectionName: 'NewJeans 1st EP New Jeans',
+      }),
+    ]))
+    const provider = createItunesCatalogProvider({ fetch: fetchMock })
+
+    await expect(provider.search(GENRE_SEED)).resolves.toEqual({
+      status: 'ok',
+      tracks: [
+        {
+          provider: 'itunes',
+          catalogId: '1659513441',
+          title: 'Ditto',
+          artist: 'NewJeans',
+          album: 'NewJeans 1st Single OMG',
+          url: 'https://music.apple.com/kr/album/ditto/1659513440?i=1659513441',
+          durationMs: 185507,
+          primaryGenre: 'K-Pop',
+          providerScore: 1,
+        },
+        expect.objectContaining({
+          catalogId: '2',
+          title: 'Hype Boy',
+          providerScore: 0.5,
+        }),
+      ],
+    })
+
+    const requestedUrl = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(requestedUrl.searchParams.get('term')).toBe('dream pop')
+    expect(requestedUrl.searchParams.get('limit')).toBe('25')
+  })
+
+  it('reuses successful discovery results for the same normalized term', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(itunesResponse([song()]))
+    const provider = createItunesCatalogProvider({ fetch: fetchMock })
+
+    const first = provider.search(GENRE_SEED)
+    const second = provider.search({ ...GENRE_SEED, term: ' Dream   Pop ' })
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
+    expect(fetchMock).toHaveBeenCalledOnce()
+  })
+
   it('searches the Korean song catalog and returns canonical metadata', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(itunesResponse([song()]))
     const provider = createItunesCatalogProvider({ fetch: fetchMock })

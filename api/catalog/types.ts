@@ -58,3 +58,39 @@ export type CatalogSearchSeed = {
 export type CatalogSearchPlan = {
   seeds: CatalogSearchSeed[]
 }
+
+export type CatalogDiscoveredTrack = {
+  provider: 'itunes' | 'musicbrainz'
+  catalogId: string
+  title: string
+  artist: string
+  album: string
+  url: string | null
+  durationMs: number | null
+  primaryGenre: string
+  providerScore: number
+}
+
+export type CatalogUnavailableReason =
+  | 'timeout'
+  | 'rate_limited'
+  | 'network'
+  | 'invalid_response'
+
+export type CatalogDiscoveryResult =
+  | { status: 'ok'; tracks: readonly CatalogDiscoveredTrack[] }
+  | { status: 'unavailable'; reason: CatalogUnavailableReason }
+
+export interface CatalogDiscoveryProvider {
+  search(
+    seed: CatalogSearchSeed,
+    signal?: AbortSignal,
+  ): Promise<CatalogDiscoveryResult>
+}
+
+export interface SimilarArtistSeedResolver {
+  findSimilarArtistSeed(
+    inputArtist: string,
+    signal?: AbortSignal,
+  ): Promise<CatalogSearchSeed | null>
+}

@@ -45,4 +45,18 @@ describe('TtlCache', () => {
 
     expect(cache.get('a')).toBeUndefined()
   })
+
+  it('deletes one cached value without clearing the rest', () => {
+    const cache = new TtlCache<string, number>({
+      ttlMs: 1_000,
+      maxEntries: 2,
+    })
+
+    cache.set('a', 1)
+    cache.set('b', 2)
+    cache.delete('a')
+
+    expect(cache.get('a')).toBeUndefined()
+    expect(cache.get('b')).toBe(2)
+  })
 })
