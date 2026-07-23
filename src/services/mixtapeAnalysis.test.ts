@@ -59,12 +59,31 @@ describe('generateMixtapeFromTracks', () => {
 
   it('converts a structured server error into a retryable analysis error', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
+      error: {
+        code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+        stage: 'catalog',
+        message: '다시 시도해주세요.',
+        retryable: true,
+      },
+    }, { ok: false, status: 502 })))
+
+    await expect(generateMixtapeFromTracks([
+      { id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' },
+    ])).rejects.toMatchObject({
+      code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+      stage: 'catalog',
+      retryable: true,
+    })
+  })
+
+  it('maps a legacy server error without a stage to taste', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({
       error: { code: 'ANALYSIS_FAILED', message: '다시 시도해주세요.', retryable: true },
     }, { ok: false, status: 502 })))
 
     await expect(generateMixtapeFromTracks([
       { id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' },
-    ])).rejects.toMatchObject({ code: 'ANALYSIS_FAILED', retryable: true })
+    ])).rejects.toMatchObject({ stage: 'taste' })
   })
 
   it('rejects an invalid server response instead of inventing a result', async () => {

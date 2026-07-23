@@ -312,6 +312,7 @@ export async function verifyMixtapeRecommendations(options: {
     if (timedOut()) {
       throw new MixtapeAnalysisError({
         code: 'REQUEST_TIMEOUT',
+        stage: 'catalog',
         message: '검증 시간이 너무 오래 걸렸어요. 다시 시도해주세요.',
         retryable: true,
       })
@@ -320,6 +321,7 @@ export async function verifyMixtapeRecommendations(options: {
     if (sawUnavailable && !sawCatalogDecision) {
       throw new MixtapeAnalysisError({
         code: 'CATALOG_UNAVAILABLE',
+        stage: 'catalog',
         message: '음악 카탈로그에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
         retryable: true,
       })
@@ -327,6 +329,7 @@ export async function verifyMixtapeRecommendations(options: {
 
     throw new MixtapeAnalysisError({
       code: 'CATALOG_VERIFICATION_FAILED',
+      stage: 'catalog',
       message: '실재하는 추천곡을 확인하지 못했어요. 다시 분석해주세요.',
       retryable: true,
     })

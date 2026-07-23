@@ -120,6 +120,7 @@ export function createOpenAiProvider({
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
             code: 'TASTE_ANALYSIS_FAILED',
+            stage: 'taste',
             message: '취향 분석 결과 형식을 확인할 수 없어요.',
             retryable: true,
           })
@@ -132,6 +133,7 @@ export function createOpenAiProvider({
         const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
           code: timedOut ? 'REQUEST_TIMEOUT' : 'TASTE_ANALYSIS_FAILED',
+          stage: 'taste',
           message: timedOut
             ? '취향 분석 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '취향 분석 서비스에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
@@ -150,6 +152,7 @@ export function createOpenAiProvider({
       if (candidateIds.length < 5) {
         throw new MixtapeAnalysisError({
           code: 'CURATION_INVALID_RESPONSE',
+          stage: 'curation',
           message: '고를 수 있는 곡 후보가 충분하지 않아요.',
           retryable: true,
         })
@@ -211,6 +214,7 @@ export function createOpenAiProvider({
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
             code: 'CURATION_INVALID_RESPONSE',
+            stage: 'curation',
             message: '믹스테이프 선곡 결과를 확인할 수 없어요.',
             retryable: true,
           })
@@ -223,6 +227,7 @@ export function createOpenAiProvider({
         const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
           code: timedOut ? 'REQUEST_TIMEOUT' : 'CURATION_FAILED',
+          stage: 'curation',
           message: timedOut
             ? '믹스테이프 선곡 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '믹스테이프 선곡 서비스에 연결하지 못했어요. 다시 시도해주세요.',
@@ -258,6 +263,7 @@ export function createOpenAiProvider({
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
             code: 'INVALID_RESPONSE',
+            stage: 'taste',
             message: '취향 분석 결과 형식을 확인할 수 없어요.',
             retryable: true,
           })
@@ -270,6 +276,7 @@ export function createOpenAiProvider({
         const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
           code: timedOut ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
+          stage: 'taste',
           message: timedOut
             ? '취향 분석 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '취향 분석 서비스에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
@@ -326,6 +333,7 @@ Replacement mode:
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
             code: 'INVALID_RESPONSE',
+            stage: 'curation',
             message: '교체 추천곡 결과 형식을 확인할 수 없어요.',
             retryable: true,
           })
@@ -338,6 +346,7 @@ Replacement mode:
         const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
           code: timedOut ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
+          stage: 'curation',
           message: timedOut
             ? '교체 추천 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '새 추천곡을 가져오지 못했어요. 잠시 후 다시 시도해주세요.',

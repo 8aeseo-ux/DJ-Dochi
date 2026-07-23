@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { GenerateMixtapeRequestSchema } from '../src/types/mixtape'
 import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis'
-import type { MixtapeAnalysisIssue } from '../src/types/mixtapeAnalysis'
+import type {
+  MixtapeAnalysisIssue,
+  MixtapeAnalysisStage,
+} from '../src/types/mixtapeAnalysis'
 import { assembleVerifiedMixtape } from './catalog/assembleVerifiedMixtape'
 import { buildCatalogSearchPlan } from './catalog/buildCatalogSearchPlan'
 import { collectCatalogCandidates } from './catalog/collectCatalogCandidates'
@@ -57,10 +60,14 @@ function statusForIssue(code: MixtapeAnalysisIssue['code']) {
   return 502
 }
 
-function issueFromUnknown(error: unknown): MixtapeAnalysisIssue {
+function issueFromUnknown(
+  error: unknown,
+  fallbackStage: MixtapeAnalysisStage,
+): MixtapeAnalysisIssue {
   if (error instanceof MixtapeAnalysisError) {
     return {
       code: error.code,
+      stage: error.stage,
       message: error.message,
       retryable: error.retryable,
     }
@@ -68,7 +75,12 @@ function issueFromUnknown(error: unknown): MixtapeAnalysisIssue {
 
   return {
     code: 'ANALYSIS_FAILED',
-    message: '취향 분석에 실패했어요. 잠시 후 다시 시도해주세요.',
+    stage: fallbackStage,
+    message: fallbackStage === 'catalog'
+      ? '취향은 읽었지만 확인되는 추천곡 후보를 모으지 못했어요.'
+      : fallbackStage === 'curation'
+        ? '곡을 고르는 중에 문제가 생겼어요. 다시 시도해주세요.'
+        : '취향 분석에 실패했어요. 잠시 후 다시 시도해주세요.',
     retryable: true,
   }
 }
@@ -76,6 +88,7 @@ function issueFromUnknown(error: unknown): MixtapeAnalysisIssue {
 function insufficientCatalogCandidates(): never {
   throw new MixtapeAnalysisError({
     code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+    stage: 'catalog',
     message: '확인되는 추천곡 후보를 충분히 모으지 못했어요.',
     retryable: true,
   })
@@ -131,6 +144,7 @@ export default {
       return json({
         error: {
           code: 'INVALID_REQUEST',
+          stage: 'taste',
           message: 'POST 요청만 사용할 수 있어요.',
           retryable: false,
         },
@@ -143,6 +157,7 @@ export default {
     } catch {
       return errorResponse({
         code: 'INVALID_REQUEST',
+        stage: 'taste',
         message: '요청 형식을 확인할 수 없어요.',
         retryable: false,
       }, 400)
@@ -152,6 +167,7 @@ export default {
     if (!parsedRequest.success) {
       return errorResponse({
         code: 'INVALID_REQUEST',
+        stage: 'taste',
         message: '확인된 곡 목록이 필요해요.',
         retryable: false,
       }, 400)
@@ -168,7 +184,7 @@ export default {
         curationGuidePrompt: CURATION_GUIDE_PROMPT,
       })
     } catch (error) {
-      const issue = issueFromUnknown(error)
+      const issue = issueFromUnknown(error, 'taste')
       return errorResponse(issue, statusForIssue(issue.code))
     }
 
@@ -178,6 +194,7 @@ export default {
       request.signal,
       MIXTAPE_PIPELINE.serverBudgetMs,
     )
+    let activeStage: MixtapeAnalysisStage = 'taste'
 
     try {
       const confirmedTracks = parsedRequest.data.tracks
@@ -192,6 +209,7 @@ export default {
       logStage('taste_analysis', tasteStartedAt, startedAt, deadlineAt)
 
       const plan = buildCatalogSearchPlan(tasteProfile, confirmedTracks)
+      activeStage = 'catalog'
       const itunes = createItunesCatalogProvider()
       const musicBrainz = createMusicBrainzCatalogProvider()
       const discoveryStartedAt = Date.now()
@@ -250,6 +268,7 @@ export default {
         title,
         artist,
       }))
+      activeStage = 'curation'
       let lastCurationError: unknown
 
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -311,12 +330,13 @@ export default {
 
       throw lastCurationError
     } catch (error) {
-      const issue = issueFromUnknown(error)
+      const issue = issueFromUnknown(error, activeStage)
       console.warn({
         event: 'pipeline_complete',
         status: 'error',
         durationMs: Date.now() - startedAt,
         code: issue.code,
+        stage: issue.stage,
       })
       return errorResponse(issue, statusForIssue(issue.code))
     } finally {

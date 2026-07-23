@@ -264,6 +264,7 @@ describe('POST /api/generate-mixtape', () => {
     await expect(response.json()).resolves.toEqual({
       error: {
         code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+        stage: 'catalog',
         message: '확인되는 추천곡 후보를 충분히 모으지 못했어요.',
         retryable: true,
       },
@@ -278,6 +279,7 @@ describe('POST /api/generate-mixtape', () => {
       .mockImplementationOnce(() => {
         throw new MixtapeAnalysisError({
           code: 'CURATION_INVALID_RESPONSE',
+          stage: 'curation',
           message: '선택 오류',
           retryable: true,
         })
@@ -304,6 +306,7 @@ describe('POST /api/generate-mixtape', () => {
     assembleMock.mockImplementation(() => {
       throw new MixtapeAnalysisError({
         code: 'CURATION_INVALID_RESPONSE',
+        stage: 'curation',
         message: '선택 오류',
         retryable: true,
       })
@@ -323,6 +326,7 @@ describe('POST /api/generate-mixtape', () => {
       expect(options?.signal?.aborted).toBe(true)
       throw new MixtapeAnalysisError({
         code: 'REQUEST_TIMEOUT',
+        stage: 'taste',
         message: '취향 분석 요청 시간이 초과됐어요.',
         retryable: true,
       })
@@ -370,6 +374,7 @@ describe('POST /api/generate-mixtape', () => {
     createProviderMock.mockImplementation(() => {
       throw new MixtapeAnalysisError({
         code: 'MISSING_API_KEY',
+        stage: 'taste',
         message: '키가 없어요.',
         retryable: false,
       })
@@ -381,6 +386,7 @@ describe('POST /api/generate-mixtape', () => {
     await expect(response.json()).resolves.toEqual({
       error: {
         code: 'MISSING_API_KEY',
+        stage: 'taste',
         message: '키가 없어요.',
         retryable: false,
       },

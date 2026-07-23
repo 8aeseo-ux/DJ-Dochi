@@ -76,6 +76,7 @@ export function parseMixtapeResult(value: unknown): MixtapeResult {
   if (!parsed.success) {
     throw new MixtapeAnalysisError({
       code: 'INVALID_RESPONSE',
+      stage: 'curation',
       message: '취향 분석 결과 형식을 확인할 수 없어요. 다시 시도해주세요.',
       retryable: true,
     }, { cause: parsed.error })

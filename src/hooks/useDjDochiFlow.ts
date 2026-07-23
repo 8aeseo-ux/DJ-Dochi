@@ -261,9 +261,15 @@ export function useDjDochiFlow(): DjDochiFlow {
         if (tasteAnalysisControllerRef.current !== controller || controller.signal.aborted) return
         tasteAnalysisControllerRef.current = null
         const issue: MixtapeAnalysisIssue = error instanceof MixtapeAnalysisError
-          ? { code: error.code, message: error.message, retryable: error.retryable }
+          ? {
+              code: error.code,
+              stage: error.stage,
+              message: error.message,
+              retryable: error.retryable,
+            }
           : {
               code: 'ANALYSIS_FAILED',
+              stage: 'taste',
               message: '취향 분석에 실패했어요. 다시 시도해주세요.',
               retryable: true,
             }

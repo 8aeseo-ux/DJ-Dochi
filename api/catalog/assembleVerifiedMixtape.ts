@@ -25,6 +25,7 @@ type AssembleVerifiedMixtapeOptions = {
 function invalidSelection(message: string): never {
   throw new MixtapeAnalysisError({
     code: 'CURATION_INVALID_RESPONSE',
+    stage: 'curation',
     message,
     retryable: true,
   })

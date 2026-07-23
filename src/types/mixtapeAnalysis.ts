@@ -14,14 +14,18 @@ export type MixtapeAnalysisErrorCode =
   | 'CURATION_FAILED'
   | 'ANALYSIS_FAILED'
 
+export type MixtapeAnalysisStage = 'taste' | 'catalog' | 'curation'
+
 export type MixtapeAnalysisIssue = {
   code: MixtapeAnalysisErrorCode
+  stage: MixtapeAnalysisStage
   message: string
   retryable: boolean
 }
 
 export class MixtapeAnalysisError extends Error implements MixtapeAnalysisIssue {
   readonly code: MixtapeAnalysisErrorCode
+  readonly stage: MixtapeAnalysisStage
   readonly retryable: boolean
   readonly cause?: unknown
 
@@ -29,6 +33,7 @@ export class MixtapeAnalysisError extends Error implements MixtapeAnalysisIssue 
     super(issue.message)
     this.name = 'MixtapeAnalysisError'
     this.code = issue.code
+    this.stage = issue.stage
     this.retryable = issue.retryable
     this.cause = options?.cause
   }

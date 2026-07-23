@@ -255,7 +255,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
 
           {state === 'tasteAnalysisError' && tasteAnalysisError && (
             <TasteAnalysisErrorPanel
-              message={tasteAnalysisError.message}
+              issue={tasteAnalysisError}
               onRetry={actions.retryTasteAnalysis}
               onChooseImage={actions.chooseAnotherImage}
               onChooseText={actions.chooseTextAfterExtraction}

@@ -22,6 +22,7 @@ export function createLlmProvider(
   if (provider !== 'openai') {
     throw new MixtapeAnalysisError({
       code: 'PROVIDER_UNAVAILABLE',
+      stage: 'taste',
       message: '현재 사용할 수 있는 취향 분석 provider가 아니에요.',
       retryable: false,
     })
@@ -30,6 +31,7 @@ export function createLlmProvider(
   if (!environment.apiKey?.trim()) {
     throw new MixtapeAnalysisError({
       code: 'MISSING_API_KEY',
+      stage: 'taste',
       message: '취향 분석 API 키가 아직 설정되지 않았어요.',
       retryable: false,
     })
@@ -38,6 +40,7 @@ export function createLlmProvider(
   if (!environment.model?.trim()) {
     throw new MixtapeAnalysisError({
       code: 'MISSING_MODEL',
+      stage: 'taste',
       message: '취향 분석 모델명이 아직 설정되지 않았어요.',
       retryable: false,
     })

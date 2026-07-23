@@ -44,6 +44,7 @@ export function normalizeMixtapeDraftCandidates(
   if (candidates.length === 0) {
     throw new MixtapeAnalysisError({
       code: 'INVALID_RESPONSE',
+      stage: 'curation',
       message: '새로운 추천곡을 만들지 못했어요. 다시 분석해주세요.',
       retryable: true,
     })

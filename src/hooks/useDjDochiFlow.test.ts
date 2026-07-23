@@ -371,8 +371,9 @@ describe('useDjDochiFlow', () => {
     extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
     generateMixtapeMock
       .mockRejectedValueOnce(new MixtapeAnalysisError({
-        code: 'ANALYSIS_FAILED',
-        message: '취향 분석에 실패했어요.',
+        code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+        stage: 'catalog',
+        message: '확인되는 추천곡 후보가 부족해요.',
         retryable: true,
       }))
       .mockResolvedValueOnce(MIXTAPE_RESULT)
@@ -394,7 +395,10 @@ describe('useDjDochiFlow', () => {
     await act(async () => { await Promise.resolve() })
 
     expect(result.current.state).toBe('tasteAnalysisError')
-    expect(result.current.tasteAnalysisError).toMatchObject({ code: 'ANALYSIS_FAILED' })
+    expect(result.current.tasteAnalysisError).toMatchObject({
+      code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+      stage: 'catalog',
+    })
     expect(result.current.mixtapeResult).toBe(null)
 
     act(() => result.current.actions.retryTasteAnalysis())

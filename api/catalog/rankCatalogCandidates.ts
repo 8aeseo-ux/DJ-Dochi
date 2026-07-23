@@ -86,6 +86,7 @@ export function scoreCatalogCandidate(
 function insufficientCandidates(): never {
   throw new MixtapeAnalysisError({
     code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+    stage: 'catalog',
     message: '확인되는 추천곡 후보를 충분히 모으지 못했어요.',
     retryable: true,
   })
