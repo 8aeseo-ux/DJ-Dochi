@@ -45,6 +45,16 @@ describe('POST /api/extract-playlist', () => {
     expect(extractWithOpenAIMock).not.toHaveBeenCalled()
   })
 
+  it('accepts both Dothome origins and rejects foreign origins', async () => {
+    const secureRequest = createRequest(undefined, 'OPTIONS')
+    secureRequest.headers.set('Origin', 'https://qotjdus1016.dothome.co.kr')
+    const foreignRequest = createRequest(undefined, 'OPTIONS')
+    foreignRequest.headers.set('Origin', 'https://example.com')
+
+    await expect(handler.fetch(secureRequest)).resolves.toMatchObject({ status: 204 })
+    await expect(handler.fetch(foreignRequest)).resolves.toMatchObject({ status: 403 })
+  })
+
   it('rejects non-POST requests', async () => {
     const response = await handler.fetch(createRequest(undefined, 'GET'))
 

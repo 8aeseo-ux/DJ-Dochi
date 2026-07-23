@@ -200,6 +200,17 @@ describe('POST /api/generate-mixtape', () => {
     expect(createProviderMock).not.toHaveBeenCalled()
   })
 
+  it('accepts both Dothome origins and rejects foreign origins', async () => {
+    const secureRequest = createRequest({}, 'OPTIONS')
+    secureRequest.headers.set('Origin', 'https://qotjdus1016.dothome.co.kr')
+    const foreignRequest = createRequest({}, 'OPTIONS')
+    foreignRequest.headers.set('Origin', 'https://example.com')
+
+    await expect(handler.fetch(secureRequest)).resolves.toMatchObject({ status: 204 })
+    await expect(handler.fetch(foreignRequest)).resolves.toMatchObject({ status: 403 })
+    expect(createProviderMock).not.toHaveBeenCalled()
+  })
+
   it('rejects non-POST and invalid generation requests', async () => {
     const getResponse = await handler.fetch(createRequest({}, 'GET'))
     const invalidResponse = await handler.fetch(createRequest({ tracks: [] }))

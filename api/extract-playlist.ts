@@ -2,6 +2,7 @@ import { validatePlaylistImage } from '../src/config/playlistAnalysis.js'
 import { PlaylistAnalysisError } from '../src/types/playlistAnalysis.js'
 import type { PlaylistAnalysisIssue } from '../src/types/playlistAnalysis.js'
 import { extractPlaylistWithOpenAI } from '../server/openaiPlaylistExtractor.js'
+import { isAllowedBrowserOrigin } from '../server/cors.js'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
@@ -35,6 +36,10 @@ function isFile(value: FormDataEntryValue | null): value is File {
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    if (!isAllowedBrowserOrigin(request)) {
+      return new Response(null, { status: 403 })
+    }
+
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,

@@ -13,6 +13,7 @@ import { createMusicBrainzCatalogProvider } from '../server/catalog/musicBrainzC
 import { shortlistCatalogCandidates } from '../server/catalog/rankCatalogCandidates.js'
 import { createLlmProvider } from '../server/llm/provider.js'
 import { MIXTAPE_PIPELINE } from '../server/mixtapePipelineConfig.js'
+import { isAllowedBrowserOrigin } from '../server/cors.js'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',
@@ -140,6 +141,10 @@ function logStage(
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    if (!isAllowedBrowserOrigin(request)) {
+      return new Response(null, { status: 403 })
+    }
+
     if (request.method === 'OPTIONS') {
       return new Response(null, {
         status: 204,

@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "http://qotjdus1016.dothome.co.kr"
+          "value": "*"
         },
         {
           "key": "Access-Control-Allow-Methods",
