@@ -16,7 +16,7 @@ export type LlmProviderEnvironment = {
 
 export function createLlmProvider(
   environment: LlmProviderEnvironment,
-): LlmProvider & Partial<CatalogSeededLlmProvider> {
+): LlmProvider & CatalogSeededLlmProvider {
   const provider = environment.provider?.trim().toLowerCase() || 'openai'
 
   if (provider !== 'openai') {

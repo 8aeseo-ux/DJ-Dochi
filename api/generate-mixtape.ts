@@ -2,11 +2,13 @@ import { readFileSync } from 'node:fs'
 import { GenerateMixtapeRequestSchema } from '../src/types/mixtape'
 import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis'
 import type { MixtapeAnalysisIssue } from '../src/types/mixtapeAnalysis'
-import { createLlmProvider } from './llm/provider'
-import { createCatalogProviderChain } from './catalog/catalogProviderChain'
+import { assembleVerifiedMixtape } from './catalog/assembleVerifiedMixtape'
+import { buildCatalogSearchPlan } from './catalog/buildCatalogSearchPlan'
+import { collectCatalogCandidates } from './catalog/collectCatalogCandidates'
 import { createItunesCatalogProvider } from './catalog/itunesCatalogProvider'
 import { createMusicBrainzCatalogProvider } from './catalog/musicBrainzCatalogProvider'
-import { verifyMixtapeRecommendations } from './catalog/verifyMixtapeRecommendations'
+import { shortlistCatalogCandidates } from './catalog/rankCatalogCandidates'
+import { createLlmProvider } from './llm/provider'
 import { MIXTAPE_PIPELINE } from './mixtapePipelineConfig'
 
 const JSON_HEADERS = {
@@ -14,10 +16,25 @@ const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
 }
 
-const DOCHI_GUIDE_PROMPT = readFileSync(
+const BASE_GUIDE_PROMPT = readFileSync(
   new URL('../prompts/dochi-mixtape-guide.md', import.meta.url),
   'utf8',
 )
+const TASTE_GUIDE_PROMPT = readFileSync(
+  new URL('../prompts/dochi-taste-guide.md', import.meta.url),
+  'utf8',
+)
+const CURATION_GUIDE_PROMPT = readFileSync(
+  new URL('../prompts/dochi-curation-guide.md', import.meta.url),
+  'utf8',
+)
+
+type PipelineStage =
+  | 'taste_analysis'
+  | 'catalog_discovery'
+  | 'candidate_ranking'
+  | 'mixtape_curation'
+  | 'result_assembly'
 
 function json(data: unknown, status = 200, headers: HeadersInit = {}) {
   return new Response(JSON.stringify(data), {
@@ -31,14 +48,22 @@ function errorResponse(issue: MixtapeAnalysisIssue, status: number) {
 }
 
 function statusForIssue(code: MixtapeAnalysisIssue['code']) {
-  if (code === 'MISSING_API_KEY' || code === 'MISSING_MODEL' || code === 'PROVIDER_UNAVAILABLE') return 503
+  if (
+    code === 'MISSING_API_KEY'
+    || code === 'MISSING_MODEL'
+    || code === 'PROVIDER_UNAVAILABLE'
+  ) return 503
   if (code === 'REQUEST_TIMEOUT') return 504
   return 502
 }
 
 function issueFromUnknown(error: unknown): MixtapeAnalysisIssue {
   if (error instanceof MixtapeAnalysisError) {
-    return { code: error.code, message: error.message, retryable: error.retryable }
+    return {
+      code: error.code,
+      message: error.message,
+      retryable: error.retryable,
+    }
   }
 
   return {
@@ -46,6 +71,14 @@ function issueFromUnknown(error: unknown): MixtapeAnalysisIssue {
     message: '취향 분석에 실패했어요. 잠시 후 다시 시도해주세요.',
     retryable: true,
   }
+}
+
+function insufficientCatalogCandidates(): never {
+  throw new MixtapeAnalysisError({
+    code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+    message: '확인되는 추천곡 후보를 충분히 모으지 못했어요.',
+    retryable: true,
+  })
 }
 
 function createPipelineAbortContext(
@@ -75,17 +108,20 @@ function createPipelineAbortContext(
 }
 
 function logStage(
-  stage: 'llm_initial' | 'catalog_verification',
-  durationMs: number,
-  elapsedMs: number,
-  remainingMs: number,
+  stage: PipelineStage,
+  stageStartedAt: number,
+  pipelineStartedAt: number,
+  deadlineAt: number,
+  metrics: Record<string, number> = {},
 ) {
+  const endedAt = Date.now()
   console.info({
     event: 'pipeline_stage',
     stage,
-    durationMs,
-    elapsedMs,
-    remainingMs,
+    durationMs: endedAt - stageStartedAt,
+    elapsedMs: endedAt - pipelineStartedAt,
+    remainingMs: Math.max(0, deadlineAt - endedAt),
+    ...metrics,
   })
 }
 
@@ -127,7 +163,9 @@ export default {
         provider: process.env.LLM_PROVIDER,
         apiKey: process.env.OPENAI_API_KEY,
         model: process.env.OPENAI_MODEL,
-        guidePrompt: DOCHI_GUIDE_PROMPT,
+        guidePrompt: BASE_GUIDE_PROMPT,
+        tasteGuidePrompt: TASTE_GUIDE_PROMPT,
+        curationGuidePrompt: CURATION_GUIDE_PROMPT,
       })
     } catch (error) {
       const issue = issueFromUnknown(error)
@@ -143,44 +181,135 @@ export default {
 
     try {
       const confirmedTracks = parsedRequest.data.tracks
-      const llmStartedAt = Date.now()
-      const draft = await provider.generateMixtape({
-        tracks: confirmedTracks.map(({ title, artist, album }) => ({ title, artist, album })),
+      const tasteStartedAt = Date.now()
+      const tasteProfile = await provider.analyzeTaste({
+        tracks: confirmedTracks.map(({ title, artist, album }) => ({
+          title,
+          artist,
+          album,
+        })),
       }, { signal: abortContext.signal })
-      logStage(
-        'llm_initial',
-        Date.now() - llmStartedAt,
-        Date.now() - startedAt,
-        Math.max(0, deadlineAt - Date.now()),
-      )
+      logStage('taste_analysis', tasteStartedAt, startedAt, deadlineAt)
 
-      const catalog = createCatalogProviderChain({
-        primary: createItunesCatalogProvider(),
-        fallback: createMusicBrainzCatalogProvider(),
-      })
-      const catalogStartedAt = Date.now()
-      const result = await verifyMixtapeRecommendations({
-        draft,
+      const plan = buildCatalogSearchPlan(tasteProfile, confirmedTracks)
+      const itunes = createItunesCatalogProvider()
+      const musicBrainz = createMusicBrainzCatalogProvider()
+      const discoveryStartedAt = Date.now()
+      const collection = await collectCatalogCandidates({
+        plan,
+        tasteProfile,
         confirmedTracks,
-        llmProvider: provider,
-        catalog,
+        itunes,
+        musicBrainz,
         signal: abortContext.signal,
         deadlineAt,
       })
       logStage(
-        'catalog_verification',
-        Date.now() - catalogStartedAt,
-        Date.now() - startedAt,
-        Math.max(0, deadlineAt - Date.now()),
+        'catalog_discovery',
+        discoveryStartedAt,
+        startedAt,
+        deadlineAt,
+        {
+          rawCandidateCount: collection.tracks.length,
+          attemptedSeeds: collection.attemptedSeeds,
+          itunesCalls: collection.itunesCalls,
+          musicBrainzCalls: collection.musicBrainzCalls,
+          unavailableCalls: collection.unavailableCalls,
+        },
       )
-      console.info({
-        event: 'pipeline_complete',
-        status: 'success',
-        durationMs: Date.now() - startedAt,
-        verifiedCount: result.mixtape.tracks.length,
-        partialResult: result.mixtape.tracks.length < draft.mixtape.tracks.length,
+      if (
+        collection.tracks.length
+        < MIXTAPE_PIPELINE.minimumRawCandidates
+      ) {
+        insufficientCatalogCandidates()
+      }
+
+      const rankingStartedAt = Date.now()
+      const shortlist = shortlistCatalogCandidates(collection.tracks, {
+        tasteProfile,
+        inputArtists: new Set(
+          confirmedTracks.map(({ artist }) => artist),
+        ),
       })
-      return json(result)
+      if (
+        shortlist.length
+        < MIXTAPE_PIPELINE.minimumShortlistCandidates
+      ) {
+        insufficientCatalogCandidates()
+      }
+      logStage(
+        'candidate_ranking',
+        rankingStartedAt,
+        startedAt,
+        deadlineAt,
+        { shortlistCount: shortlist.length },
+      )
+
+      const candidates = shortlist.map(({ id, title, artist }) => ({
+        candidateId: id,
+        title,
+        artist,
+      }))
+      let lastCurationError: unknown
+
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const curationStartedAt = Date.now()
+          const selection = await provider.curateMixtape({
+            tasteProfile,
+            candidates,
+          }, { signal: abortContext.signal })
+          logStage(
+            'mixtape_curation',
+            curationStartedAt,
+            startedAt,
+            deadlineAt,
+            { curationAttempt: attempt + 1 },
+          )
+
+          const assemblyStartedAt = Date.now()
+          const result = assembleVerifiedMixtape({
+            tasteProfile,
+            selection,
+            shortlist,
+            confirmedTracks,
+          })
+          logStage(
+            'result_assembly',
+            assemblyStartedAt,
+            startedAt,
+            deadlineAt,
+            { selectedCount: result.mixtape.tracks.length },
+          )
+          console.info({
+            event: 'pipeline_complete',
+            status: 'success',
+            durationMs: Date.now() - startedAt,
+            selectedCount: result.mixtape.tracks.length,
+          })
+          return json(result)
+        } catch (error) {
+          lastCurationError = error
+          const retryableSelectionError = (
+            error instanceof MixtapeAnalysisError
+            && error.code === 'CURATION_INVALID_RESPONSE'
+          )
+          const hasTimeForRetry = (
+            Date.now()
+            < deadlineAt - MIXTAPE_PIPELINE.stopBufferMs
+          )
+          if (
+            attempt === 0
+            && retryableSelectionError
+            && hasTimeForRetry
+          ) {
+            continue
+          }
+          throw error
+        }
+      }
+
+      throw lastCurationError
     } catch (error) {
       const issue = issueFromUnknown(error)
       console.warn({

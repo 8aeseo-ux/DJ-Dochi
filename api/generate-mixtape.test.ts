@@ -2,73 +2,144 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis'
-import type { LlmProvider } from '../src/services/llm/types'
+import type {
+  CatalogSeededLlmProvider,
+  LlmProvider,
+  LlmMixtapeSelection,
+  TasteDiscoveryProfile,
+} from '../src/services/llm/types'
+import type {
+  CatalogCandidateCollection,
+  CatalogPoolTrack,
+  CatalogSearchPlan,
+} from './catalog/types'
 import { createLlmProvider } from './llm/provider'
-import { verifyMixtapeRecommendations } from './catalog/verifyMixtapeRecommendations'
+import { buildCatalogSearchPlan } from './catalog/buildCatalogSearchPlan'
+import { collectCatalogCandidates } from './catalog/collectCatalogCandidates'
+import { shortlistCatalogCandidates } from './catalog/rankCatalogCandidates'
+import { assembleVerifiedMixtape } from './catalog/assembleVerifiedMixtape'
+import { createItunesCatalogProvider } from './catalog/itunesCatalogProvider'
+import { createMusicBrainzCatalogProvider } from './catalog/musicBrainzCatalogProvider'
 import handler from './generate-mixtape'
 
 vi.mock('./llm/provider', () => ({
   createLlmProvider: vi.fn(),
 }))
-
-vi.mock('./catalog/verifyMixtapeRecommendations', () => ({
-  verifyMixtapeRecommendations: vi.fn(),
+vi.mock('./catalog/buildCatalogSearchPlan', () => ({
+  buildCatalogSearchPlan: vi.fn(),
+}))
+vi.mock('./catalog/collectCatalogCandidates', () => ({
+  collectCatalogCandidates: vi.fn(),
+}))
+vi.mock('./catalog/rankCatalogCandidates', () => ({
+  shortlistCatalogCandidates: vi.fn(),
+}))
+vi.mock('./catalog/assembleVerifiedMixtape', () => ({
+  assembleVerifiedMixtape: vi.fn(),
+}))
+vi.mock('./catalog/itunesCatalogProvider', () => ({
+  createItunesCatalogProvider: vi.fn(),
+}))
+vi.mock('./catalog/musicBrainzCatalogProvider', () => ({
+  createMusicBrainzCatalogProvider: vi.fn(),
 }))
 
 const createProviderMock = vi.mocked(createLlmProvider)
-const verifyRecommendationsMock = vi.mocked(verifyMixtapeRecommendations)
+const buildPlanMock = vi.mocked(buildCatalogSearchPlan)
+const collectMock = vi.mocked(collectCatalogCandidates)
+const shortlistMock = vi.mocked(shortlistCatalogCandidates)
+const assembleMock = vi.mocked(assembleVerifiedMixtape)
+const createItunesMock = vi.mocked(createItunesCatalogProvider)
+const createMusicBrainzMock = vi.mocked(createMusicBrainzCatalogProvider)
 
-const DRAFT = {
-  tasteProfile: {
-    summary: '몽환적인 밤의 질감을 좋아해요.',
-    genres: ['dream pop'],
-    moods: ['late night'],
-    traits: ['soft vocals'],
+const PROFILE: TasteDiscoveryProfile = {
+  summary: '몽환적인 밤의 질감을 좋아해요.',
+  genres: ['dream pop'],
+  moods: ['late night'],
+  traits: ['soft vocals'],
+  searchKeywords: ['dreamy', 'ethereal'],
+}
+
+const PLAN: CatalogSearchPlan = {
+  seeds: [{
+    id: 'genre-1',
+    kind: 'genre',
+    term: 'dream pop',
+    weight: 1,
+  }],
+}
+
+function candidate(index: number): CatalogPoolTrack {
+  return {
+    provider: 'itunes',
+    catalogId: String(index),
+    id: `itunes:${index}`,
+    title: `Canonical Song ${index}`,
+    artist: `Canonical Artist ${index}`,
+    album: `Canonical Album ${index}`,
+    url: `https://music.apple.com/song/${index}`,
+    durationMs: 180_000,
+    primaryGenre: 'Dream Pop',
+    providerScore: 0.9,
+    sourceBucketIds: ['genre-1'],
+    sourceKinds: ['genre'],
+    sourceWeight: 1,
+    relevanceScore: 0.9,
+    catalogStatus: 'verified',
+  }
+}
+
+const RAW_TRACKS = Array.from({ length: 20 }, (_, index) => candidate(index + 1))
+const SHORTLIST = RAW_TRACKS.slice(0, 15)
+const COLLECTION: CatalogCandidateCollection = {
+  tracks: RAW_TRACKS,
+  attemptedSeeds: 5,
+  itunesCalls: 5,
+  musicBrainzCalls: 2,
+  unavailableCalls: 0,
+}
+
+const SELECTION: LlmMixtapeSelection = {
+  title: '새벽 두 시의 창문',
+  subtitle: 'soft lights, slow streets',
+  dochiComment: '밤에 음악 많이 듣지?',
+  design: {
+    atmosphere: '조용한 네온빛',
+    palette: ['midnight blue', 'coral'],
+    texture: 'paper',
+    motifs: ['window light'],
   },
-  mixtape: {
-    title: '새벽 두 시의 창문',
-    subtitle: 'soft lights, slow streets',
-    dochiComment: '밤에 음악 많이 듣지?',
-    design: {
-      atmosphere: '조용한 네온빛',
-      palette: ['midnight blue', 'coral'],
-      texture: 'matte plastic',
-      motifs: ['window light'],
-    },
-    tracks: [
-      {
-        title: 'Space Song',
-        artist: 'Beach House',
-        album: '',
-        reason: '입력곡의 몽환적인 결을 자연스럽게 이어가요.',
-      },
-    ],
-  },
+  tracks: SHORTLIST.slice(0, 5).map(({ id }, index) => ({
+    candidateId: id,
+    reason: `${index + 1}번째 연결 이유`,
+  })),
 }
 
 const VERIFIED_RESULT = {
-  tasteProfile: DRAFT.tasteProfile,
+  tasteProfile: {
+    summary: PROFILE.summary,
+    genres: PROFILE.genres,
+    moods: PROFILE.moods,
+    traits: PROFILE.traits,
+  },
   mixtape: {
-    title: DRAFT.mixtape.title,
-    subtitle: DRAFT.mixtape.subtitle,
-    dochiComment: DRAFT.mixtape.dochiComment,
-    design: DRAFT.mixtape.design,
-    tracks: [{
-      id: 'recommendation-001',
-      title: 'Space Song',
-      artist: 'Beach House',
-      album: 'Depression Cherry',
-      reason: DRAFT.mixtape.tracks[0].reason,
+    title: SELECTION.title,
+    subtitle: SELECTION.subtitle,
+    dochiComment: SELECTION.dochiComment,
+    design: SELECTION.design,
+    tracks: SHORTLIST.slice(0, 5).map((track, index) => ({
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      reason: `${index + 1}번째 연결 이유`,
       catalogStatus: 'verified' as const,
       platforms: {
         spotify: { id: null, url: null },
-        appleMusic: {
-          id: '1247704673',
-          url: 'https://music.apple.com/kr/album/space-song/1247704667?i=1247704673',
-        },
+        appleMusic: { id: track.catalogId, url: track.url },
         youtubeMusic: { id: null, url: null },
       },
-    }],
+    })),
   },
 }
 
@@ -81,137 +152,197 @@ function createRequest(body: unknown, method = 'POST', signal?: AbortSignal) {
   })
 }
 
+function provider(): LlmProvider & CatalogSeededLlmProvider {
+  return {
+    id: 'fake',
+    analyzeTaste: vi.fn().mockResolvedValue(PROFILE),
+    curateMixtape: vi.fn().mockResolvedValue(SELECTION),
+    generateMixtape: vi.fn(),
+    generateReplacementTracks: vi.fn(),
+  }
+}
+
+const REQUEST_TRACKS = [{
+  id: 'track-001',
+  title: 'Ditto',
+  artist: 'NewJeans',
+  album: '',
+}]
+
 describe('POST /api/generate-mixtape', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     process.env.LLM_PROVIDER = 'openai'
     process.env.OPENAI_API_KEY = 'test-key'
     process.env.OPENAI_MODEL = 'test-model'
-    verifyRecommendationsMock.mockResolvedValue(VERIFIED_RESULT)
+
+    createItunesMock.mockReturnValue({ search: vi.fn(), verify: vi.fn(), id: 'itunes' })
+    createMusicBrainzMock.mockReturnValue({
+      search: vi.fn(),
+      verify: vi.fn(),
+      findSimilarArtistSeed: vi.fn(),
+      id: 'musicbrainz',
+    })
+    buildPlanMock.mockReturnValue(PLAN)
+    collectMock.mockResolvedValue(COLLECTION)
+    shortlistMock.mockReturnValue(SHORTLIST)
+    assembleMock.mockReturnValue(VERIFIED_RESULT)
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     delete process.env.LLM_PROVIDER
     delete process.env.OPENAI_API_KEY
     delete process.env.OPENAI_MODEL
   })
 
-  it('rejects non-POST requests', async () => {
-    const response = await handler.fetch(createRequest({}, 'GET'))
+  it('rejects non-POST and invalid generation requests', async () => {
+    const getResponse = await handler.fetch(createRequest({}, 'GET'))
+    const invalidResponse = await handler.fetch(createRequest({ tracks: [] }))
 
-    expect(response.status).toBe(405)
-  })
-
-  it('rejects empty or extraction-shaped requests before calling a provider', async () => {
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '', confidence: 0.9 }],
-    }))
-
-    expect(response.status).toBe(400)
+    expect(getResponse.status).toBe(405)
+    expect(invalidResponse.status).toBe(400)
     expect(createProviderMock).not.toHaveBeenCalled()
   })
 
-  it('passes only confirmed track fields to the provider and returns normalized output', async () => {
-    const provider: LlmProvider = {
-      id: 'fake',
-      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }
-    createProviderMock.mockReturnValue(provider)
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-    }))
+  it('runs taste, discovery, ranking, candidate-id curation, and hydration in order', async () => {
+    const llm = provider()
+    createProviderMock.mockReturnValue(llm)
+
+    const response = await handler.fetch(createRequest({ tracks: REQUEST_TRACKS }))
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({
-      mixtape: {
-        title: '새벽 두 시의 창문',
-        tracks: [{ title: 'Space Song', catalogStatus: 'verified' }],
-      },
-    })
-    expect(provider.generateMixtape).toHaveBeenCalledWith(
-      {
-        tracks: [{ title: 'Ditto', artist: 'NewJeans', album: '' }],
-      },
-      {
-        signal: expect.any(AbortSignal),
-      },
-    )
-    expect(verifyRecommendationsMock).toHaveBeenCalledWith(expect.objectContaining({
-      draft: DRAFT,
-      confirmedTracks: [{
-        id: 'track-001',
-        title: 'Ditto',
-        artist: 'NewJeans',
-        album: '',
-      }],
-      llmProvider: provider,
+    await expect(response.json()).resolves.toEqual(VERIFIED_RESULT)
+    expect(llm.analyzeTaste).toHaveBeenCalledWith({
+      tracks: [{ title: 'Ditto', artist: 'NewJeans', album: '' }],
+    }, { signal: expect.any(AbortSignal) })
+    expect(buildPlanMock).toHaveBeenCalledWith(PROFILE, REQUEST_TRACKS)
+    expect(collectMock).toHaveBeenCalledWith(expect.objectContaining({
+      plan: PLAN,
+      tasteProfile: PROFILE,
+      confirmedTracks: REQUEST_TRACKS,
       signal: expect.any(AbortSignal),
       deadlineAt: expect.any(Number),
     }))
+    expect(shortlistMock).toHaveBeenCalledWith(RAW_TRACKS, {
+      tasteProfile: PROFILE,
+      inputArtists: new Set(['NewJeans']),
+    })
+    expect(llm.curateMixtape).toHaveBeenCalledWith({
+      tasteProfile: PROFILE,
+      candidates: SHORTLIST.map(({ id, title, artist }) => ({
+        candidateId: id,
+        title,
+        artist,
+      })),
+    }, { signal: expect.any(AbortSignal) })
+    expect(assembleMock).toHaveBeenCalledWith({
+      tasteProfile: PROFILE,
+      selection: SELECTION,
+      shortlist: SHORTLIST,
+      confirmedTracks: REQUEST_TRACKS,
+    })
+
+    const curationPayload = vi.mocked(llm.curateMixtape).mock.calls[0][0]
+    expect(curationPayload.candidates[0]).not.toHaveProperty('album')
+    expect(curationPayload.candidates[0]).not.toHaveProperty('url')
+    expect(llm.generateMixtape).not.toHaveBeenCalled()
+    expect(llm.generateReplacementTracks).not.toHaveBeenCalled()
   })
 
-  it('shares one request signal and a 35 second deadline across the pipeline', async () => {
-    const provider: LlmProvider = {
-      id: 'fake',
-      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }
-    createProviderMock.mockReturnValue(provider)
-    const startedAt = Date.now()
+  it('returns a catalog error before curation when fewer than twenty candidates were collected', async () => {
+    const llm = provider()
+    createProviderMock.mockReturnValue(llm)
+    collectMock.mockResolvedValueOnce({
+      ...COLLECTION,
+      tracks: RAW_TRACKS.slice(0, 19),
+    })
 
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-    }))
+    const response = await handler.fetch(createRequest({ tracks: REQUEST_TRACKS }))
 
-    const llmSignal = vi.mocked(provider.generateMixtape).mock.calls[0]?.[1]?.signal
-    const verificationOptions = verifyRecommendationsMock.mock.calls[0]?.[0]
-
-    expect(response.status).toBe(200)
-    expect(llmSignal).toBeInstanceOf(AbortSignal)
-    expect(verificationOptions?.signal).toBe(llmSignal)
-    expect(verificationOptions?.deadlineAt).toBeGreaterThanOrEqual(startedAt + 34_900)
-    expect(verificationOptions?.deadlineAt).toBeLessThanOrEqual(Date.now() + 35_000)
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toEqual({
+      error: {
+        code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+        message: '확인되는 추천곡 후보를 충분히 모으지 못했어요.',
+        retryable: true,
+      },
+    })
+    expect(llm.curateMixtape).not.toHaveBeenCalled()
   })
 
-  it('propagates a browser abort into the LLM request signal', async () => {
-    const requestController = new AbortController()
-    const provider: LlmProvider = {
-      id: 'fake',
-      generateMixtape: vi.fn().mockImplementation(async (_input, options) => {
-        requestController.abort()
-        expect(options?.signal?.aborted).toBe(true)
-
+  it('retries candidate-id curation once without rerunning taste or catalog discovery', async () => {
+    const llm = provider()
+    createProviderMock.mockReturnValue(llm)
+    assembleMock
+      .mockImplementationOnce(() => {
         throw new MixtapeAnalysisError({
-          code: 'REQUEST_TIMEOUT',
-          message: '취향 분석 요청 시간이 초과됐어요. 다시 시도해주세요.',
+          code: 'CURATION_INVALID_RESPONSE',
+          message: '선택 오류',
           retryable: true,
         })
-      }),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }
-    createProviderMock.mockReturnValue(provider)
+      })
+      .mockReturnValueOnce(VERIFIED_RESULT)
+
+    const response = await handler.fetch(createRequest({ tracks: REQUEST_TRACKS }))
+
+    expect(response.status).toBe(200)
+    expect(llm.curateMixtape).toHaveBeenCalledTimes(2)
+    expect(llm.analyzeTaste).toHaveBeenCalledOnce()
+    expect(collectMock).toHaveBeenCalledOnce()
+  })
+
+  it('does not start a curation retry inside the final stop buffer', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    const llm = provider()
+    vi.mocked(llm.curateMixtape).mockImplementation(async () => {
+      vi.setSystemTime(34_500)
+      return SELECTION
+    })
+    createProviderMock.mockReturnValue(llm)
+    assembleMock.mockImplementation(() => {
+      throw new MixtapeAnalysisError({
+        code: 'CURATION_INVALID_RESPONSE',
+        message: '선택 오류',
+        retryable: true,
+      })
+    })
+
+    const response = await handler.fetch(createRequest({ tracks: REQUEST_TRACKS }))
+
+    expect(response.status).toBe(502)
+    expect(llm.curateMixtape).toHaveBeenCalledOnce()
+  })
+
+  it('propagates browser cancellation into the shared LLM signal', async () => {
+    const requestController = new AbortController()
+    const llm = provider()
+    vi.mocked(llm.analyzeTaste).mockImplementation(async (_input, options) => {
+      requestController.abort()
+      expect(options?.signal?.aborted).toBe(true)
+      throw new MixtapeAnalysisError({
+        code: 'REQUEST_TIMEOUT',
+        message: '취향 분석 요청 시간이 초과됐어요.',
+        retryable: true,
+      })
+    })
+    createProviderMock.mockReturnValue(llm)
 
     const response = await handler.fetch(createRequest(
-      {
-        tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-      },
+      { tracks: REQUEST_TRACKS },
       'POST',
       requestController.signal,
     ))
 
     expect(response.status).toBe(504)
-    expect(verifyRecommendationsMock).not.toHaveBeenCalled()
+    expect(collectMock).not.toHaveBeenCalled()
   })
 
-  it('logs timings without logging submitted track data', async () => {
+  it('logs stage timings and counts without playlist or candidate metadata', async () => {
     const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    const provider: LlmProvider = {
-      id: 'fake',
-      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }
-    createProviderMock.mockReturnValue(provider)
+    const llm = provider()
+    createProviderMock.mockReturnValue(llm)
 
     const response = await handler.fetch(createRequest({
       tracks: [{
@@ -224,12 +355,15 @@ describe('POST /api/generate-mixtape', () => {
     const logs = JSON.stringify(infoSpy.mock.calls)
 
     expect(response.status).toBe(200)
-    expect(logs).toContain('pipeline_stage')
-    expect(logs).toContain('pipeline_complete')
-    expect(logs).toContain('durationMs')
+    expect(logs).toContain('taste_analysis')
+    expect(logs).toContain('catalog_discovery')
+    expect(logs).toContain('candidate_ranking')
+    expect(logs).toContain('mixtape_curation')
+    expect(logs).toContain('result_assembly')
+    expect(logs).toContain('rawCandidateCount')
     expect(logs).not.toContain('Private Song')
     expect(logs).not.toContain('Private Artist')
-    expect(logs).not.toContain('Private Album')
+    expect(logs).not.toContain('Canonical Song')
   })
 
   it('returns a configuration error without falling back to dummy data', async () => {
@@ -241,60 +375,14 @@ describe('POST /api/generate-mixtape', () => {
       })
     })
 
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-    }))
+    const response = await handler.fetch(createRequest({ tracks: REQUEST_TRACKS }))
 
     expect(response.status).toBe(503)
     await expect(response.json()).resolves.toEqual({
-      error: { code: 'MISSING_API_KEY', message: '키가 없어요.', retryable: false },
-    })
-  })
-
-  it('returns a retryable provider error', async () => {
-    createProviderMock.mockImplementation(() => ({
-      id: 'fake',
-      generateMixtape: vi.fn().mockRejectedValue(new MixtapeAnalysisError({
-        code: 'ANALYSIS_FAILED',
-        message: '분석 실패',
-        retryable: true,
-      })),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }))
-
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-    }))
-
-    expect(response.status).toBe(502)
-    await expect(response.json()).resolves.toEqual({
-      error: { code: 'ANALYSIS_FAILED', message: '분석 실패', retryable: true },
-    })
-  })
-
-  it('returns a retryable error when no recommendation can be catalog-verified', async () => {
-    const provider: LlmProvider = {
-      id: 'fake',
-      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
-      generateReplacementTracks: vi.fn().mockResolvedValue([]),
-    }
-    createProviderMock.mockReturnValue(provider)
-    verifyRecommendationsMock.mockRejectedValueOnce(new MixtapeAnalysisError({
-      code: 'CATALOG_VERIFICATION_FAILED',
-      message: '실재하는 추천곡을 확인하지 못했어요.',
-      retryable: true,
-    }))
-
-    const response = await handler.fetch(createRequest({
-      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
-    }))
-
-    expect(response.status).toBe(502)
-    await expect(response.json()).resolves.toEqual({
       error: {
-        code: 'CATALOG_VERIFICATION_FAILED',
-        message: '실재하는 추천곡을 확인하지 못했어요.',
-        retryable: true,
+        code: 'MISSING_API_KEY',
+        message: '키가 없어요.',
+        retryable: false,
       },
     })
   })
