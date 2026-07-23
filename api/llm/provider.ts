@@ -1,8 +1,5 @@
 import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
-import type {
-  CatalogSeededLlmProvider,
-  LlmProvider,
-} from '../../src/services/llm/types'
+import type { LlmProvider } from '../../src/services/llm/types'
 import { createOpenAiProvider } from './openaiProvider'
 
 export type LlmProviderEnvironment = {
@@ -16,7 +13,7 @@ export type LlmProviderEnvironment = {
 
 export function createLlmProvider(
   environment: LlmProviderEnvironment,
-): LlmProvider & CatalogSeededLlmProvider {
+): LlmProvider {
   const provider = environment.provider?.trim().toLowerCase() || 'openai'
 
   if (provider !== 'openai') {

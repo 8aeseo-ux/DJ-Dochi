@@ -3,7 +3,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis'
 import type {
-  CatalogSeededLlmProvider,
   LlmProvider,
   LlmMixtapeSelection,
   TasteDiscoveryProfile,
@@ -152,13 +151,11 @@ function createRequest(body: unknown, method = 'POST', signal?: AbortSignal) {
   })
 }
 
-function provider(): LlmProvider & CatalogSeededLlmProvider {
+function provider(): LlmProvider {
   return {
     id: 'fake',
     analyzeTaste: vi.fn().mockResolvedValue(PROFILE),
     curateMixtape: vi.fn().mockResolvedValue(SELECTION),
-    generateMixtape: vi.fn(),
-    generateReplacementTracks: vi.fn(),
   }
 }
 
@@ -246,8 +243,6 @@ describe('POST /api/generate-mixtape', () => {
     const curationPayload = vi.mocked(llm.curateMixtape).mock.calls[0][0]
     expect(curationPayload.candidates[0]).not.toHaveProperty('album')
     expect(curationPayload.candidates[0]).not.toHaveProperty('url')
-    expect(llm.generateMixtape).not.toHaveBeenCalled()
-    expect(llm.generateReplacementTracks).not.toHaveBeenCalled()
   })
 
   it('returns a catalog error before curation when fewer than twenty candidates were collected', async () => {

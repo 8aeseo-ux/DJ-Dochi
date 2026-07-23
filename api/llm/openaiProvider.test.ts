@@ -28,29 +28,11 @@ describe('createOpenAiProvider', () => {
     parseMock.mockReset()
     parseMock.mockResolvedValue({
       output_parsed: {
-        tasteProfile: {
-          summary: '몽환적인 밤의 질감을 좋아해.',
-          genres: ['dream pop'],
-          moods: ['late night'],
-          traits: ['soft vocals'],
-        },
-        mixtape: {
-          title: '새벽의 주파수',
-          subtitle: 'soft lights, slow streets',
-          dochiComment: '밤 공기랑 잘 맞는 곡들이네.',
-          design: {
-            atmosphere: 'midnight',
-            palette: ['navy', 'amber'],
-            texture: 'worn plastic',
-            motifs: ['streetlight'],
-          },
-          tracks: [{
-            title: 'Myth',
-            artist: 'Beach House',
-            album: 'Bloom',
-            reason: '몽환적인 질감이 자연스럽게 이어져.',
-          }],
-        },
+        summary: '몽환적인 밤의 질감을 좋아해.',
+        genres: ['dream pop'],
+        moods: ['late night'],
+        traits: ['soft vocals'],
+        searchKeywords: ['dreamy', 'ethereal'],
       },
     })
   })
@@ -62,7 +44,7 @@ describe('createOpenAiProvider', () => {
       guidePrompt: 'Dochi guide',
     })
 
-    await provider.generateMixtape({
+    await provider.analyzeTaste({
       tracks: [{
         title: 'Space Song',
         artist: 'Beach House',
@@ -213,149 +195,6 @@ describe('createOpenAiProvider', () => {
 
     expect(parseMock.mock.calls[0][1]).toEqual({ signal })
     expect(parseMock.mock.calls[1][1]).toEqual({ signal })
-  })
-
-  it('bounds the initial mixtape recommendations to five or six tracks', async () => {
-    const provider = createOpenAiProvider({
-      apiKey: 'test-key',
-      model: 'gpt-4.1-mini',
-      guidePrompt: 'Dochi guide',
-    })
-
-    await provider.generateMixtape({
-      tracks: [{
-        title: 'Space Song',
-        artist: 'Beach House',
-        album: 'Depression Cherry',
-      }],
-    })
-
-    const request = parseMock.mock.calls[0][0]
-    expect(request.text.format.schema.properties.mixtape.properties.tracks)
-      .toMatchObject({ minItems: 5, maxItems: 6 })
-  })
-
-  it('forwards the caller cancellation signal to initial mixtape requests', async () => {
-    const provider = createOpenAiProvider({
-      apiKey: 'test-key',
-      model: 'gpt-4.1-mini',
-      guidePrompt: 'Dochi guide',
-    })
-    const signal = new AbortController().signal
-
-    await provider.generateMixtape({
-      tracks: [{
-        title: 'Space Song',
-        artist: 'Beach House',
-        album: 'Depression Cherry',
-      }],
-    }, { signal })
-
-    expect(parseMock.mock.calls[0][1]).toEqual({ signal })
-  })
-
-  it('maps an aborted initial request to a retryable timeout', async () => {
-    parseMock.mockRejectedValueOnce(new Error('Request was aborted'))
-    const provider = createOpenAiProvider({
-      apiKey: 'test-key',
-      model: 'gpt-4.1-mini',
-      guidePrompt: 'Dochi guide',
-    })
-    const controller = new AbortController()
-    controller.abort()
-
-    await expect(provider.generateMixtape({
-      tracks: [{
-        title: 'Space Song',
-        artist: 'Beach House',
-        album: 'Depression Cherry',
-      }],
-    }, { signal: controller.signal })).rejects.toMatchObject({
-      code: 'REQUEST_TIMEOUT',
-      retryable: true,
-    })
-  })
-
-  it('requests only the missing replacement tracks with confirmed and excluded identities', async () => {
-    parseMock.mockResolvedValueOnce({
-      output_parsed: {
-        tracks: [{
-          title: 'Myth',
-          artist: 'Beach House',
-          album: 'Bloom',
-          reason: '몽환적인 질감이 자연스럽게 이어져.',
-        }],
-      },
-    })
-    const provider = createOpenAiProvider({
-      apiKey: 'test-key',
-      model: 'gpt-4.1-mini',
-      guidePrompt: 'Dochi guide',
-    })
-
-    await expect(provider.generateReplacementTracks({
-      confirmedTracks: [{
-        title: 'Ditto',
-        artist: 'NewJeans',
-        album: 'OMG',
-      }],
-      excludedTracks: [{
-        title: 'Imaginary Song',
-        artist: 'Imaginary Artist',
-      }],
-      count: 1,
-    })).resolves.toEqual([{
-      title: 'Myth',
-      artist: 'Beach House',
-      album: 'Bloom',
-      reason: '몽환적인 질감이 자연스럽게 이어져.',
-    }])
-
-    const request = parseMock.mock.calls[0][0]
-    const userPayload = JSON.parse(request.input[1].content[0].text)
-    expect(userPayload).toEqual({
-      confirmedTracks: [{
-        title: 'Ditto',
-        artist: 'NewJeans',
-        album: 'OMG',
-      }],
-      excludedTracks: [{
-        title: 'Imaginary Song',
-        artist: 'Imaginary Artist',
-      }],
-      requiredCount: 1,
-    })
-  })
-
-  it('forwards the caller cancellation signal to replacement requests', async () => {
-    parseMock.mockResolvedValueOnce({
-      output_parsed: {
-        tracks: [{
-          title: 'Myth',
-          artist: 'Beach House',
-          album: 'Bloom',
-          reason: '몽환적인 질감이 자연스럽게 이어져.',
-        }],
-      },
-    })
-    const provider = createOpenAiProvider({
-      apiKey: 'test-key',
-      model: 'gpt-4.1-mini',
-      guidePrompt: 'Dochi guide',
-    })
-    const signal = new AbortController().signal
-
-    await provider.generateReplacementTracks({
-      confirmedTracks: [{
-        title: 'Ditto',
-        artist: 'NewJeans',
-        album: 'OMG',
-      }],
-      excludedTracks: [],
-      count: 1,
-    }, { signal })
-
-    expect(parseMock.mock.calls[0][1]).toEqual({ signal })
   })
 
   it('keeps shared voice rules and task-specific constraints in prompt files', () => {
