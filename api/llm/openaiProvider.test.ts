@@ -107,6 +107,28 @@ describe('createOpenAiProvider', () => {
     expect(parseMock.mock.calls[0][1]).toEqual({ signal })
   })
 
+  it('maps an aborted initial request to a retryable timeout', async () => {
+    parseMock.mockRejectedValueOnce(new Error('Request was aborted'))
+    const provider = createOpenAiProvider({
+      apiKey: 'test-key',
+      model: 'gpt-4.1-mini',
+      guidePrompt: 'Dochi guide',
+    })
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(provider.generateMixtape({
+      tracks: [{
+        title: 'Space Song',
+        artist: 'Beach House',
+        album: 'Depression Cherry',
+      }],
+    }, { signal: controller.signal })).rejects.toMatchObject({
+      code: 'REQUEST_TIMEOUT',
+      retryable: true,
+    })
+  })
+
   it('requests only the missing replacement tracks with confirmed and excluded identities', async () => {
     parseMock.mockResolvedValueOnce({
       output_parsed: {

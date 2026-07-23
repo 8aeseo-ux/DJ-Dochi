@@ -72,9 +72,10 @@ const VERIFIED_RESULT = {
   },
 }
 
-function createRequest(body: unknown, method = 'POST') {
+function createRequest(body: unknown, method = 'POST', signal?: AbortSignal) {
   return new Request('http://localhost/api/generate-mixtape', {
     method,
+    signal,
     headers: { 'Content-Type': 'application/json' },
     body: method === 'POST' ? JSON.stringify(body) : undefined,
   })
@@ -128,9 +129,14 @@ describe('POST /api/generate-mixtape', () => {
         tracks: [{ title: 'Space Song', catalogStatus: 'verified' }],
       },
     })
-    expect(provider.generateMixtape).toHaveBeenCalledWith({
-      tracks: [{ title: 'Ditto', artist: 'NewJeans', album: '' }],
-    })
+    expect(provider.generateMixtape).toHaveBeenCalledWith(
+      {
+        tracks: [{ title: 'Ditto', artist: 'NewJeans', album: '' }],
+      },
+      {
+        signal: expect.any(AbortSignal),
+      },
+    )
     expect(verifyRecommendationsMock).toHaveBeenCalledWith(expect.objectContaining({
       draft: DRAFT,
       confirmedTracks: [{
@@ -140,7 +146,90 @@ describe('POST /api/generate-mixtape', () => {
         album: '',
       }],
       llmProvider: provider,
+      signal: expect.any(AbortSignal),
+      deadlineAt: expect.any(Number),
     }))
+  })
+
+  it('shares one request signal and a 35 second deadline across the pipeline', async () => {
+    const provider: LlmProvider = {
+      id: 'fake',
+      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
+      generateReplacementTracks: vi.fn().mockResolvedValue([]),
+    }
+    createProviderMock.mockReturnValue(provider)
+    const startedAt = Date.now()
+
+    const response = await handler.fetch(createRequest({
+      tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
+    }))
+
+    const llmSignal = vi.mocked(provider.generateMixtape).mock.calls[0]?.[1]?.signal
+    const verificationOptions = verifyRecommendationsMock.mock.calls[0]?.[0]
+
+    expect(response.status).toBe(200)
+    expect(llmSignal).toBeInstanceOf(AbortSignal)
+    expect(verificationOptions?.signal).toBe(llmSignal)
+    expect(verificationOptions?.deadlineAt).toBeGreaterThanOrEqual(startedAt + 34_900)
+    expect(verificationOptions?.deadlineAt).toBeLessThanOrEqual(Date.now() + 35_000)
+  })
+
+  it('propagates a browser abort into the LLM request signal', async () => {
+    const requestController = new AbortController()
+    const provider: LlmProvider = {
+      id: 'fake',
+      generateMixtape: vi.fn().mockImplementation(async (_input, options) => {
+        requestController.abort()
+        expect(options?.signal?.aborted).toBe(true)
+
+        throw new MixtapeAnalysisError({
+          code: 'REQUEST_TIMEOUT',
+          message: '취향 분석 요청 시간이 초과됐어요. 다시 시도해주세요.',
+          retryable: true,
+        })
+      }),
+      generateReplacementTracks: vi.fn().mockResolvedValue([]),
+    }
+    createProviderMock.mockReturnValue(provider)
+
+    const response = await handler.fetch(createRequest(
+      {
+        tracks: [{ id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '' }],
+      },
+      'POST',
+      requestController.signal,
+    ))
+
+    expect(response.status).toBe(504)
+    expect(verifyRecommendationsMock).not.toHaveBeenCalled()
+  })
+
+  it('logs timings without logging submitted track data', async () => {
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const provider: LlmProvider = {
+      id: 'fake',
+      generateMixtape: vi.fn().mockResolvedValue(DRAFT),
+      generateReplacementTracks: vi.fn().mockResolvedValue([]),
+    }
+    createProviderMock.mockReturnValue(provider)
+
+    const response = await handler.fetch(createRequest({
+      tracks: [{
+        id: 'private-track-id',
+        title: 'Private Song',
+        artist: 'Private Artist',
+        album: 'Private Album',
+      }],
+    }))
+    const logs = JSON.stringify(infoSpy.mock.calls)
+
+    expect(response.status).toBe(200)
+    expect(logs).toContain('pipeline_stage')
+    expect(logs).toContain('pipeline_complete')
+    expect(logs).toContain('durationMs')
+    expect(logs).not.toContain('Private Song')
+    expect(logs).not.toContain('Private Artist')
+    expect(logs).not.toContain('Private Album')
   })
 
   it('returns a configuration error without falling back to dummy data', async () => {

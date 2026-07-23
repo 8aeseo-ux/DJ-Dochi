@@ -103,9 +103,10 @@ export function createOpenAiProvider({
       } catch (error) {
         if (error instanceof MixtapeAnalysisError) throw error
 
+        const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
-          code: isTimeoutError(error) ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
-          message: isTimeoutError(error)
+          code: timedOut ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
+          message: timedOut
             ? '취향 분석 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '취향 분석 서비스에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
           retryable: true,
@@ -170,9 +171,10 @@ Replacement mode:
       } catch (error) {
         if (error instanceof MixtapeAnalysisError) throw error
 
+        const timedOut = options?.signal?.aborted === true || isTimeoutError(error)
         throw new MixtapeAnalysisError({
-          code: isTimeoutError(error) ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
-          message: isTimeoutError(error)
+          code: timedOut ? 'REQUEST_TIMEOUT' : 'ANALYSIS_FAILED',
+          message: timedOut
             ? '교체 추천 시간이 너무 오래 걸렸어요. 다시 시도해주세요.'
             : '새 추천곡을 가져오지 못했어요. 잠시 후 다시 시도해주세요.',
           retryable: true,
