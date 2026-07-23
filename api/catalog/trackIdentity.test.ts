@@ -2,7 +2,13 @@
 
 import { describe, expect, it } from 'vitest'
 import type { CatalogCandidate, CatalogMatch } from './types'
-import { selectCatalogMatch, trackIdentityKey } from './trackIdentity'
+import {
+  artistIdentityKey,
+  hasUnsupportedVersion,
+  normalizedCatalogText,
+  selectCatalogMatch,
+  trackIdentityKey,
+} from './trackIdentity'
 
 function candidate(title: string, artist: string): CatalogCandidate {
   return {
@@ -35,6 +41,21 @@ describe('trackIdentityKey', () => {
     expect(trackIdentityKey(candidate('  Ditto! ', 'NEW JEANS'))).toBe(
       trackIdentityKey(candidate('ditto', 'new-jeans')),
     )
+  })
+
+  it('exposes stable text and artist normalization for candidate collection', () => {
+    expect(normalizedCatalogText('  New-Jeans! ')).toBe('newjeans')
+    expect(artistIdentityKey('NEW JEANS')).toBe(
+      artistIdentityKey('new-jeans'),
+    )
+  })
+})
+
+describe('hasUnsupportedVersion', () => {
+  it('rejects alternate versions unless the taste explicitly allows that form', () => {
+    expect(hasUnsupportedVersion('Blue Monday (Live)', new Set())).toBe(true)
+    expect(hasUnsupportedVersion('Blue Monday Remix', new Set(['remix']))).toBe(false)
+    expect(hasUnsupportedVersion('Blue Monday', new Set())).toBe(false)
   })
 })
 

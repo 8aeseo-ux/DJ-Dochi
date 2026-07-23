@@ -94,3 +94,20 @@ export interface SimilarArtistSeedResolver {
     signal?: AbortSignal,
   ): Promise<CatalogSearchSeed | null>
 }
+
+export type CatalogPoolTrack = CatalogDiscoveredTrack & {
+  id: string
+  sourceBucketIds: string[]
+  sourceKinds: CatalogSearchBucketKind[]
+  sourceWeight: number
+  relevanceScore: number
+  catalogStatus: 'verified'
+}
+
+export type CatalogCandidateCollection = {
+  tracks: CatalogPoolTrack[]
+  attemptedSeeds: number
+  itunesCalls: number
+  musicBrainzCalls: number
+  unavailableCalls: number
+}

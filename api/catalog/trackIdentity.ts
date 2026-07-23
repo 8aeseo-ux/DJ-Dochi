@@ -25,7 +25,7 @@ const VERSION_PATTERNS = [
   ['mix', /\b(?:dolby atmos|mix)\b|믹스/iu],
 ] as const
 
-function normalizeText(value: string): string {
+export function normalizedCatalogText(value: string): string {
   return value
     .normalize('NFKC')
     .toLocaleLowerCase()
@@ -39,6 +39,18 @@ function versionTokens(value: string): Set<string> {
       .filter(([, pattern]) => pattern.test(value.normalize('NFKC')))
       .map(([token]) => token),
   )
+}
+
+export function artistIdentityKey(artist: string): string {
+  return normalizedCatalogText(artist)
+}
+
+export function hasUnsupportedVersion(
+  title: string,
+  allowedVersionTerms: ReadonlySet<string>,
+): boolean {
+  const tokens = versionTokens(title)
+  return [...tokens].some((token) => !allowedVersionTerms.has(token))
 }
 
 function stripVersionSegments(value: string): string {
@@ -100,7 +112,7 @@ function equivalentRecordings(left: CatalogMatch, right: CatalogMatch): boolean 
 export function trackIdentityKey(
   track: Pick<CatalogCandidate, 'title' | 'artist'>,
 ): string {
-  return `${normalizeText(track.title)}\u0000${normalizeText(track.artist)}`
+  return `${normalizedCatalogText(track.title)}\u0000${normalizedCatalogText(track.artist)}`
 }
 
 export function selectCatalogMatch(
@@ -109,18 +121,18 @@ export function selectCatalogMatch(
 ): CatalogSelectionResult {
   if (items.length === 0) return { status: 'not_found' }
 
-  const candidateTitle = normalizeText(stripVersionSegments(candidate.title))
-  const candidateArtist = normalizeText(candidate.artist)
+  const candidateTitle = normalizedCatalogText(stripVersionSegments(candidate.title))
+  const candidateArtist = normalizedCatalogText(candidate.artist)
   const candidateVersions = versionTokens(candidate.title)
   const scored = items.map((match) => {
     const matchVersionText = `${match.title} ${match.version ?? ''}`
     const titleSimilarity = diceCoefficient(
       candidateTitle,
-      normalizeText(stripVersionSegments(match.title)),
+      normalizedCatalogText(stripVersionSegments(match.title)),
     )
     const artistSimilarity = diceCoefficient(
       candidateArtist,
-      normalizeText(match.artist),
+      normalizedCatalogText(match.artist),
     )
     const hasVersionMismatch = !setsEqual(
       candidateVersions,
