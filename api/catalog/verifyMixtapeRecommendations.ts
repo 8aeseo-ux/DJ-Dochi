@@ -11,7 +11,8 @@ import {
   normalizeMixtapeDraftCandidates,
 } from '../llm/normalizeMixtape'
 import type { LlmMixtapeDraft } from '../../src/services/llm/types'
-import type { CatalogProviderChain } from './catalogProviderChain'
+import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig'
+import type { CatalogProviderPhases } from './catalogProviderChain'
 import { trackIdentityKey } from './trackIdentity'
 import type {
   CatalogCandidate,
@@ -19,7 +20,7 @@ import type {
   CatalogVerificationResult,
 } from './types'
 
-export const MAX_REPLACEMENT_ROUNDS = 2
+export const MAX_REPLACEMENT_ROUNDS = MIXTAPE_PIPELINE.maximumReplacementRounds
 
 type SafeLogger = Pick<Console, 'info' | 'warn'>
 
@@ -98,6 +99,7 @@ function logVerification(
   result: CatalogVerificationResult,
   round: number,
   candidateIndex: number,
+  phase: 'itunes' | 'musicbrainz',
 ) {
   const entry = {
     event: 'catalog_verification',
@@ -110,6 +112,7 @@ function logVerification(
     ),
     round,
     candidateIndex,
+    phase,
   }
 
   if (result.status === 'verified') logger.info(entry)
@@ -120,10 +123,14 @@ export async function verifyMixtapeRecommendations(options: {
   draft: LlmMixtapeDraft
   confirmedTracks: readonly ConfirmedTrack[]
   llmProvider: LlmProvider
-  catalog: CatalogProviderChain
+  catalog: CatalogProviderPhases
   logger?: SafeLogger
+  signal?: AbortSignal
+  deadlineAt?: number
+  now?: () => number
 }): Promise<MixtapeResult> {
   const logger = options.logger ?? defaultLogger
+  const now = options.now ?? Date.now
   const normalized = normalizeMixtapeDraftCandidates(
     options.draft,
     options.confirmedTracks,
@@ -134,6 +141,24 @@ export async function verifyMixtapeRecommendations(options: {
   const verified = new Map<string, VerifiedCandidate>()
   let sawUnavailable = false
   let sawCatalogDecision = false
+  let musicBrainzChecks = 0
+
+  const shouldStopNewWork = () => (
+    options.signal?.aborted === true
+    || verified.size >= MIXTAPE_PIPELINE.minimumVerifiedTracks
+    || (
+      options.deadlineAt !== undefined
+      && options.deadlineAt - now() <= MIXTAPE_PIPELINE.stopBufferMs
+    )
+  )
+
+  const timedOut = () => (
+    options.signal?.aborted === true
+    || (
+      options.deadlineAt !== undefined
+      && options.deadlineAt - now() <= MIXTAPE_PIPELINE.stopBufferMs
+    )
+  )
 
   for (const track of options.confirmedTracks) {
     excluded.set(trackIdentityKey(track), {
@@ -152,14 +177,23 @@ export async function verifyMixtapeRecommendations(options: {
     candidates: readonly CatalogCandidate[],
     round: number,
   ) {
-    for (const [candidateIndex, candidate] of candidates.entries()) {
-      const result = await options.catalog.verify(candidate, requestCache)
-      logVerification(logger, result, round, candidateIndex)
+    const startedAt = now()
+    const primaryFailures: Array<{
+      candidate: CatalogCandidate
+      candidateIndex: number
+    }> = []
+    let itunesChecks = 0
+    let roundMusicBrainzChecks = 0
+    let nextCandidateIndex = 0
 
+    function recordResult(
+      candidate: CatalogCandidate,
+      result: CatalogVerificationResult,
+    ) {
       if (result.status === 'unavailable') sawUnavailable = true
       else sawCatalogDecision = true
 
-      if (result.status !== 'verified') continue
+      if (result.status !== 'verified') return
 
       const canonicalKey = trackIdentityKey(result.match)
       if (!verified.has(canonicalKey)) {
@@ -170,16 +204,76 @@ export async function verifyMixtapeRecommendations(options: {
         })
       }
     }
+
+    async function primaryWorker() {
+      while (
+        nextCandidateIndex < candidates.length
+        && !shouldStopNewWork()
+      ) {
+        const candidateIndex = nextCandidateIndex
+        nextCandidateIndex += 1
+        const candidate = candidates[candidateIndex]
+        itunesChecks += 1
+        const result = await options.catalog.verifyPrimary(
+          candidate,
+          requestCache,
+          options.signal,
+        )
+        logVerification(logger, result, round, candidateIndex, 'itunes')
+        recordResult(candidate, result)
+
+        if (result.status !== 'verified') {
+          primaryFailures.push({ candidate, candidateIndex })
+        }
+      }
+    }
+
+    const workerCount = Math.min(
+      MIXTAPE_PIPELINE.itunesConcurrency,
+      candidates.length,
+    )
+    await Promise.all(Array.from(
+      { length: workerCount },
+      () => primaryWorker(),
+    ))
+
+    for (const { candidate, candidateIndex } of primaryFailures) {
+      if (
+        shouldStopNewWork()
+        || musicBrainzChecks >= MIXTAPE_PIPELINE.maximumMusicBrainzChecks
+      ) {
+        break
+      }
+
+      musicBrainzChecks += 1
+      roundMusicBrainzChecks += 1
+      const result = await options.catalog.verifyFallback(
+        candidate,
+        requestCache,
+        options.signal,
+      )
+      logVerification(logger, result, round, candidateIndex, 'musicbrainz')
+      recordResult(candidate, result)
+    }
+
+    logger.info({
+      event: 'catalog_round',
+      round,
+      durationMs: Math.max(0, now() - startedAt),
+      itunesChecks,
+      musicBrainzChecks: roundMusicBrainzChecks,
+      verifiedCount: verified.size,
+    })
   }
 
   await verifyRound(normalized.candidates, 0)
 
   for (
     let round = 1;
-    round <= MAX_REPLACEMENT_ROUNDS && verified.size < targetCount;
+    round <= MAX_REPLACEMENT_ROUNDS && !shouldStopNewWork();
     round += 1
   ) {
-    const count = targetCount - verified.size
+    const count = MIXTAPE_PIPELINE.minimumVerifiedTracks - verified.size
     logger.info({
       event: 'replacement_request',
       round,
@@ -195,7 +289,7 @@ export async function verifyMixtapeRecommendations(options: {
       })),
       excludedTracks: [...excluded.values()],
       count,
-    })
+    }, { signal: options.signal })
     const replacementCandidates = normalizeReplacementCandidates(
       replacements,
       new Set(excluded.keys()),
@@ -211,7 +305,15 @@ export async function verifyMixtapeRecommendations(options: {
     await verifyRound(replacementCandidates, round)
   }
 
-  if (verified.size === 0) {
+  if (verified.size < MIXTAPE_PIPELINE.minimumVerifiedTracks) {
+    if (timedOut()) {
+      throw new MixtapeAnalysisError({
+        code: 'REQUEST_TIMEOUT',
+        message: '검증 시간이 너무 오래 걸렸어요. 다시 시도해주세요.',
+        retryable: true,
+      })
+    }
+
     if (sawUnavailable && !sawCatalogDecision) {
       throw new MixtapeAnalysisError({
         code: 'CATALOG_UNAVAILABLE',
