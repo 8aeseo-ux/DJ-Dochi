@@ -8,4 +8,12 @@ export const MIXTAPE_PIPELINE = {
   stopBufferMs: 1_000,
   itunesConcurrency: 3,
   maximumMusicBrainzChecks: 3,
+  rawCandidateTarget: 25,
+  minimumRawCandidates: 20,
+  maximumRawCandidates: 30,
+  shortlistTarget: 15,
+  minimumShortlistCandidates: 12,
+  maximumShortlistCandidates: 15,
+  maximumItunesSearches: 6,
+  maximumMusicBrainzRequests: 3,
 } as const

@@ -35,3 +35,26 @@ export interface CatalogVerificationProvider {
     signal?: AbortSignal,
   ): Promise<CatalogVerificationResult>
 }
+
+export type CatalogSearchBucketKind =
+  | 'genre'
+  | 'genre_mood'
+  | 'input_artist'
+  | 'similar_artist'
+
+export type CatalogSearchSeed = {
+  id: string
+  kind: CatalogSearchBucketKind
+  term: string
+  weight: number
+  sourceArtist?: string
+  catalogEvidence?: {
+    provider: 'musicbrainz'
+    entityId: string
+    tag: string
+  }
+}
+
+export type CatalogSearchPlan = {
+  seeds: CatalogSearchSeed[]
+}
