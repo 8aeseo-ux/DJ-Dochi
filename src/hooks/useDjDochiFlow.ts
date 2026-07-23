@@ -2,16 +2,21 @@ import { useEffect, useRef, useState } from 'react'
 import { validatePlaylistImage } from '../config/playlistAnalysis'
 import type { SpinFeedbackBand, SpinMetrics } from '../lib/vinylPhysics'
 import { extractPlaylistFromImage } from '../services/playlistAnalysis'
+import { generateMixtapeFromTracks } from '../services/mixtapeAnalysis'
+import { parsePastedPlaylist } from '../services/extraction/parsePastedPlaylist'
 import type {
   ExtractionProgress,
   PlaylistExtractorId,
 } from '../services/extraction/types'
 import { PlaylistAnalysisError } from '../types/playlistAnalysis'
+import { MixtapeAnalysisError } from '../types/mixtapeAnalysis'
 import type {
   ExtractedTrack,
   PlaylistAnalysisIssue,
   PlaylistExtractionResult,
 } from '../types/playlistAnalysis'
+import type { ConfirmedTrack, MixtapeResult } from '../types/mixtape'
+import type { MixtapeAnalysisIssue } from '../types/mixtapeAnalysis'
 import type { DochiFlowState, InputMode, PhotoData, PlaylistInput } from '../types'
 
 const CELEBRATION_DURATION_MS = 1_000
@@ -38,6 +43,7 @@ const RETURN_LINES = [
 const HANDOFF_LINES = ['좋아.', '이제 같이 믹스를 시작해보자.'] as const
 const EXTRACTION_LINES = ['어디 보자.', '곡 이름부터 읽어볼게.'] as const
 const EXTRACTION_REVIEW_LINES = ['내가 이렇게 읽었어.', '틀린 게 있으면 고쳐줘.'] as const
+const TASTE_ANALYSIS_LINES = ['좋아. 이제 네 취향을 좀 볼게.'] as const
 const PHOTO_PROMPT_LINES = ['됐다.', '근데 아직 하나 부족해.', '우리 기념사진 하나 찍을래?'] as const
 const FINAL_TAPE_LINES = ['좋아.', '이제 진짜 우리 테이프다.'] as const
 
@@ -48,7 +54,7 @@ const SPIN_REACTIONS: Record<Exclude<SpinFeedbackBand, 'idle'>, readonly string[
   overdrive: ['어어어, 너무 잘 돌리는데?!'],
 }
 
-type DialogueTrack = 'intro' | 'handoff' | 'extracting' | 'extractionReview' | 'photoPrompt' | 'finalTape' | 'return' | null
+type DialogueTrack = 'intro' | 'handoff' | 'extracting' | 'extractionReview' | 'analyzingTaste' | 'photoPrompt' | 'finalTape' | 'return' | null
 
 export type DjDochiFlowActions = {
   notice: () => void
@@ -61,6 +67,7 @@ export type DjDochiFlowActions = {
   closeInput: () => void
   handoff: () => void
   retryExtraction: (extractorId?: PlaylistExtractorId) => void
+  retryTasteAnalysis: () => void
   updateExtractedTrack: (id: string, field: 'title' | 'artist', value: string) => void
   deleteExtractedTrack: (id: string) => void
   addExtractedTrack: () => void
@@ -93,6 +100,8 @@ export type DjDochiFlow = {
   extractionError: PlaylistAnalysisIssue | null
   activeExtractorId: PlaylistExtractorId
   extractionProgress: ExtractionProgress | null
+  mixtapeResult: MixtapeResult | null
+  tasteAnalysisError: MixtapeAnalysisIssue | null
   workMessage: string | null
   spinEnergy: number
   spinIntensity: number
@@ -112,6 +121,7 @@ function getDialogueLines(track: Exclude<DialogueTrack, null>) {
   if (track === 'handoff') return HANDOFF_LINES
   if (track === 'extracting') return EXTRACTION_LINES
   if (track === 'extractionReview') return EXTRACTION_REVIEW_LINES
+  if (track === 'analyzingTaste') return TASTE_ANALYSIS_LINES
   if (track === 'photoPrompt') return PHOTO_PROMPT_LINES
   if (track === 'finalTape') return FINAL_TAPE_LINES
   return RETURN_LINES
@@ -128,6 +138,8 @@ export function useDjDochiFlow(): DjDochiFlow {
   const [extractionError, setExtractionError] = useState<PlaylistAnalysisIssue | null>(null)
   const [activeExtractorId, setActiveExtractorId] = useState<PlaylistExtractorId>('browser-ocr')
   const [extractionProgress, setExtractionProgress] = useState<ExtractionProgress | null>(null)
+  const [mixtapeResult, setMixtapeResult] = useState<MixtapeResult | null>(null)
+  const [tasteAnalysisError, setTasteAnalysisError] = useState<MixtapeAnalysisIssue | null>(null)
   const [spinEnergy, setSpinEnergy] = useState(0)
   const [spinIntensity, setSpinIntensity] = useState(0)
   const [spinReaction, setSpinReaction] = useState<string | null>(null)
@@ -139,6 +151,8 @@ export function useDjDochiFlow(): DjDochiFlow {
   const reactionVariantRef = useRef(0)
   const overdriveTimerRef = useRef<number | null>(null)
   const extractionControllerRef = useRef<AbortController | null>(null)
+  const tasteAnalysisControllerRef = useRef<AbortController | null>(null)
+  const confirmedTracksRef = useRef<ConfirmedTrack[]>([])
   const manualTrackIdRef = useRef(0)
 
   inputRef.current = input
@@ -162,6 +176,8 @@ export function useDjDochiFlow(): DjDochiFlow {
   const dialogueKey = dialogueTrack ? `${dialogueTrack}-${dialogueIndex}` : 'none'
   const workMessage = state === 'extracting'
     ? 'READING TRACKS...'
+    : state === 'analyzingTaste'
+      ? 'CHECKING TASTE...'
     : state === 'working'
     ? 'SPIN TO CHARGE'
     : state === 'recordingIntro'
@@ -222,15 +238,55 @@ export function useDjDochiFlow(): DjDochiFlow {
       })
   }
 
+  const beginTasteAnalysis = (tracks: readonly ConfirmedTrack[]) => {
+    tasteAnalysisControllerRef.current?.abort()
+    const controller = new AbortController()
+    tasteAnalysisControllerRef.current = controller
+    setTasteAnalysisError(null)
+    setDialogueTrack('analyzingTaste')
+    setDialogueIndex(0)
+    setState('analyzingTaste')
+
+    void generateMixtapeFromTracks(tracks, { signal: controller.signal })
+      .then((result) => {
+        if (tasteAnalysisControllerRef.current !== controller || controller.signal.aborted) return
+        tasteAnalysisControllerRef.current = null
+        setMixtapeResult(result)
+        setTasteAnalysisError(null)
+        setDialogueTrack('handoff')
+        setDialogueIndex(0)
+        setState('receivingInput')
+      })
+      .catch((error: unknown) => {
+        if (tasteAnalysisControllerRef.current !== controller || controller.signal.aborted) return
+        tasteAnalysisControllerRef.current = null
+        const issue: MixtapeAnalysisIssue = error instanceof MixtapeAnalysisError
+          ? { code: error.code, message: error.message, retryable: error.retryable }
+          : {
+              code: 'ANALYSIS_FAILED',
+              message: '취향 분석에 실패했어요. 다시 시도해주세요.',
+              retryable: true,
+            }
+        setTasteAnalysisError(issue)
+        setDialogueTrack(null)
+        setState('tasteAnalysisError')
+      })
+  }
+
   const returnToInput = (mode: Exclude<InputMode, null>) => {
     extractionControllerRef.current?.abort()
     extractionControllerRef.current = null
+    tasteAnalysisControllerRef.current?.abort()
+    tasteAnalysisControllerRef.current = null
+    confirmedTracksRef.current = []
     resetInput()
     setInputError(null)
     setExtractionResult(null)
     setExtractionError(null)
     setActiveExtractorId('browser-ocr')
     setExtractionProgress(null)
+    setMixtapeResult(null)
+    setTasteAnalysisError(null)
     setDialogueTrack(null)
     setDialogueIndex(0)
     setInputMode(mode)
@@ -256,6 +312,7 @@ export function useDjDochiFlow(): DjDochiFlow {
 
       if (dialogueTrack === 'intro') setState('choosingInput')
       if (dialogueTrack === 'handoff') {
+        if (!mixtapeResult) return
         setDialogueTrack(null)
         setSpinEnergy(0)
         setState('working')
@@ -265,12 +322,18 @@ export function useDjDochiFlow(): DjDochiFlow {
       if (state !== 'choosingInput') return
       resetInput()
       setInputError(null)
+      setMixtapeResult(null)
+      setTasteAnalysisError(null)
+      confirmedTracksRef.current = []
       setInputMode('image')
     },
     chooseText: () => {
       if (state !== 'choosingInput') return
       resetInput()
       setInputError(null)
+      setMixtapeResult(null)
+      setTasteAnalysisError(null)
+      confirmedTracksRef.current = []
       setInputMode('text')
     },
     selectImage: (file) => {
@@ -308,15 +371,24 @@ export function useDjDochiFlow(): DjDochiFlow {
         return
       }
 
-      setDialogueTrack('handoff')
+      const pastedResult = parsePastedPlaylist(currentInput.pastedText)
+      resetInput()
+      setExtractionResult(pastedResult)
+      setExtractionError(null)
+      setDialogueTrack('extractionReview')
       setDialogueIndex(0)
-      setState('receivingInput')
+      setState('extractionReview')
     },
     retryExtraction: (extractorId) => {
       if (state !== 'extractionReview' && state !== 'extractionError') return
       const file = inputRef.current.imageFile
       if (!file) returnToInput('image')
       else beginExtraction(file, extractorId ?? activeExtractorId)
+    },
+    retryTasteAnalysis: () => {
+      if (state !== 'tasteAnalysisError') return
+      if (confirmedTracksRef.current.length === 0) return
+      beginTasteAnalysis(confirmedTracksRef.current)
     },
     updateExtractedTrack: (id, field, value) => {
       if (state !== 'extractionReview') return
@@ -352,11 +424,11 @@ export function useDjDochiFlow(): DjDochiFlow {
         artist: track.artist.trim(),
       }))
       if (tracks.length === 0 || tracks.some((track) => !track.title || !track.artist)) return
+      const confirmedTracks = tracks.map(({ id, title, artist, album }) => ({ id, title, artist, album }))
+      confirmedTracksRef.current = confirmedTracks
       setExtractionResult({ ...extractionResult, tracks })
       resetInput()
-      setDialogueTrack('handoff')
-      setDialogueIndex(0)
-      setState('receivingInput')
+      beginTasteAnalysis(confirmedTracks)
     },
     chooseAnotherImage: () => returnToInput('image'),
     chooseTextAfterExtraction: () => returnToInput('text'),
@@ -440,6 +512,9 @@ export function useDjDochiFlow(): DjDochiFlow {
     restart: () => {
       extractionControllerRef.current?.abort()
       extractionControllerRef.current = null
+      tasteAnalysisControllerRef.current?.abort()
+      tasteAnalysisControllerRef.current = null
+      confirmedTracksRef.current = []
       resetInput()
       setInputMode(null)
       setInputError(null)
@@ -447,6 +522,8 @@ export function useDjDochiFlow(): DjDochiFlow {
       setExtractionError(null)
       setActiveExtractorId('browser-ocr')
       setExtractionProgress(null)
+      setMixtapeResult(null)
+      setTasteAnalysisError(null)
       setDialogueTrack(null)
       setDialogueIndex(0)
       setSpinEnergy(0)
@@ -499,6 +576,7 @@ export function useDjDochiFlow(): DjDochiFlow {
   useEffect(() => () => {
     if (overdriveTimerRef.current !== null) window.clearTimeout(overdriveTimerRef.current)
     extractionControllerRef.current?.abort()
+    tasteAnalysisControllerRef.current?.abort()
   }, [])
 
   useEffect(() => {
@@ -525,6 +603,8 @@ export function useDjDochiFlow(): DjDochiFlow {
     extractionError,
     activeExtractorId,
     extractionProgress,
+    mixtapeResult,
+    tasteAnalysisError,
     workMessage,
     spinEnergy,
     spinIntensity,

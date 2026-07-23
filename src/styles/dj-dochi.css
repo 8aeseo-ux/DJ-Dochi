@@ -1250,6 +1250,29 @@ input:focus-visible {
   font-size: 0.72rem;
 }
 
+.mixtape-card__taste {
+  display: grid;
+  gap: 0.42rem;
+  margin-bottom: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px dashed var(--line-strong);
+  background: rgba(247, 233, 201, 0.025);
+}
+
+.mixtape-card__taste p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.mixtape-card__atmosphere {
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+}
+
 .mixtape-card__sticker {
   display: grid;
   flex: 0 0 auto;
@@ -1316,6 +1339,15 @@ input:focus-visible {
 .track-row__name span {
   color: var(--muted);
   font-size: 0.65rem;
+}
+
+.track-row__name small {
+  overflow: hidden;
+  color: var(--dim);
+  font-size: 0.52rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .track-row__mood,

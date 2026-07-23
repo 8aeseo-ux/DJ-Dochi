@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { DUMMY_MIXTAPE_RESULT } from '../data/playlist'
 import type { DochiPose } from '../types'
 import type { DjDochiFlow } from '../hooks/useDjDochiFlow'
 import ChoiceMenu from './ChoiceMenu'
@@ -13,6 +14,7 @@ import PlaylistInputPanel from './PlaylistInputPanel'
 import PlaylistExtractionReview from './PlaylistExtractionReview'
 import PhotoReview from './PhotoReview'
 import PolaroidComposer from './PolaroidComposer'
+import TasteAnalysisErrorPanel from './TasteAnalysisErrorPanel'
 import VinylInteraction from './VinylInteraction'
 import WorkshopEffects from './WorkshopEffects'
 import RetroButton from './RetroButton'
@@ -67,6 +69,8 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     extractionError,
     activeExtractorId,
     extractionProgress,
+    tasteAnalysisError,
+    mixtapeResult,
     workMessage,
     spinEnergy,
     spinIntensity,
@@ -81,9 +85,11 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     || state === 'needleDropping'
     || state === 'recording'
   const isExtracting = state === 'extracting'
+  const isAnalyzingTaste = state === 'analyzingTaste'
   const isRecording = state === 'recording'
   const vinylPhase = state === 'needleDropping' ? 'needle' : isRecording ? 'recording' : 'spin'
   const isTapeAvailable = state === 'finalTape' || state === 'givingTape' || state === 'viewingTape'
+  const renderedMixtape = mixtapeResult ?? (import.meta.env.DEV ? DUMMY_MIXTAPE_RESULT : null)
   const isLastDialogueLine = dialogue !== null && dialogue.index === dialogue.total - 1
   const isPhotoPromptChoice = state === 'photoPrompt' && isLastDialogueLine
   const isFinalTapeChoice = state === 'finalTape' && isLastDialogueLine
@@ -195,6 +201,15 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             </Panel>
           )}
 
+          {isAnalyzingTaste && (
+            <Panel className="taste-analysis-status" role="status" aria-label="취향 분석 중">
+              <span className="screen-eyebrow">DOCHI TASTE / ANALYZING</span>
+              <div className="playlist-extraction-status__scan" aria-hidden="true"><i /><i /><i /></div>
+              <strong>확인한 곡들로 네 취향을 살펴보는 중...</strong>
+              <p>검수한 곡 목록만 분석에 사용하고 있어요.</p>
+            </Panel>
+          )}
+
           {state === 'extractionReview' && extractionResult && (
             <PlaylistExtractionReview
               result={extractionResult}
@@ -238,6 +253,15 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             </Panel>
           )}
 
+          {state === 'tasteAnalysisError' && tasteAnalysisError && (
+            <TasteAnalysisErrorPanel
+              message={tasteAnalysisError.message}
+              onRetry={actions.retryTasteAnalysis}
+              onChooseImage={actions.chooseAnotherImage}
+              onChooseText={actions.chooseTextAfterExtraction}
+            />
+          )}
+
           {isPhotoPromptChoice && (
             <ChoiceMenu
               items={[
@@ -276,8 +300,9 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             />
           )}
 
-          {isTapeAvailable && (
+          {isTapeAvailable && renderedMixtape && (
             <FinalMixtape
+              result={renderedMixtape}
               open={state === 'viewingTape'}
               polaroidUrl={polaroidUrl}
               onOpen={actions.openTape}

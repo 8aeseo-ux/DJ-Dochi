@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { DUMMY_MIXTAPE_RESULT } from './data/playlist'
 import { VINYL_PHYSICS } from './lib/vinylPhysics'
 
 vi.mock('./components/PolaroidComposer', () => ({
@@ -159,9 +160,18 @@ describe('DJ DOCHI fixed-room flow', () => {
     finishIntroWithEvents()
     fireEvent.click(screen.getByRole('button', { name: '음악 목록 적어주기' }))
     fireEvent.change(screen.getByLabelText('음악 목록'), { target: { value: 'Beach House - Space Song' } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => DUMMY_MIXTAPE_RESULT,
+    }))
     fireEvent.click(screen.getByRole('button', { name: '도치에게 건네기' }))
 
     expect(screen.queryByRole('dialog', { name: '플레이리스트 입력' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '추출한 음악 목록 확인' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이 목록이 맞아' }))
+    await act(async () => {
+      for (let tick = 0; tick < 10; tick += 1) await Promise.resolve()
+    })
 
     const handoffLines = ['좋아.', '이제 같이 믹스를 시작해보자.']
     for (const line of handoffLines) {
