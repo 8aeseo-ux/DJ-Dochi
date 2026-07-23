@@ -21,7 +21,7 @@ export function createPlaylistAnalysisService(
     file: File,
     options: ExtractPlaylistFromImageOptions = {},
   ): Promise<PlaylistExtractionResult> {
-    const extractor = factory(options.extractorId ?? 'browser-ocr')
+    const extractor = factory(options.extractorId ?? 'openai-vision')
 
     return extractor.extract(file, {
       signal: options.signal,

@@ -136,7 +136,7 @@ export function useDjDochiFlow(): DjDochiFlow {
   const [inputError, setInputError] = useState<PlaylistAnalysisIssue | null>(null)
   const [extractionResult, setExtractionResult] = useState<PlaylistExtractionResult | null>(null)
   const [extractionError, setExtractionError] = useState<PlaylistAnalysisIssue | null>(null)
-  const [activeExtractorId, setActiveExtractorId] = useState<PlaylistExtractorId>('browser-ocr')
+  const [activeExtractorId, setActiveExtractorId] = useState<PlaylistExtractorId>('openai-vision')
   const [extractionProgress, setExtractionProgress] = useState<ExtractionProgress | null>(null)
   const [mixtapeResult, setMixtapeResult] = useState<MixtapeResult | null>(null)
   const [tasteAnalysisError, setTasteAnalysisError] = useState<MixtapeAnalysisIssue | null>(null)
@@ -190,7 +190,7 @@ export function useDjDochiFlow(): DjDochiFlow {
 
   const beginExtraction = (
     file: File,
-    extractorId: PlaylistExtractorId = 'browser-ocr',
+    extractorId: PlaylistExtractorId = 'openai-vision',
   ) => {
     extractionControllerRef.current?.abort()
     const controller = new AbortController()
@@ -289,7 +289,7 @@ export function useDjDochiFlow(): DjDochiFlow {
     setInputError(null)
     setExtractionResult(null)
     setExtractionError(null)
-    setActiveExtractorId('browser-ocr')
+    setActiveExtractorId('openai-vision')
     setExtractionProgress(null)
     setMixtapeResult(null)
     setTasteAnalysisError(null)
@@ -526,7 +526,7 @@ export function useDjDochiFlow(): DjDochiFlow {
       setInputError(null)
       setExtractionResult(null)
       setExtractionError(null)
-      setActiveExtractorId('browser-ocr')
+      setActiveExtractorId('openai-vision')
       setExtractionProgress(null)
       setMixtapeResult(null)
       setTasteAnalysisError(null)

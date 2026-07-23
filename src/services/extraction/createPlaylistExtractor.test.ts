@@ -12,12 +12,12 @@ const fakeEngine: BrowserOcrEngine = {
 }
 
 describe('createPlaylistExtractor', () => {
-  it('uses browser OCR as the fixed default', () => {
-    expect(createPlaylistExtractor(undefined, { ocrEngine: fakeEngine }).id).toBe('browser-ocr')
+  it('uses AI Vision as the default while preserving browser OCR as an option', () => {
+    expect(createPlaylistExtractor(undefined, { ocrEngine: fakeEngine }).id).toBe('openai-vision')
     expect(createPlaylistExtractor('browser-ocr', { ocrEngine: fakeEngine }).id).toBe('browser-ocr')
   })
 
-  it('creates the preserved OpenAI Vision adapter only when selected', () => {
+  it('creates the OpenAI Vision adapter when selected', () => {
     expect(createPlaylistExtractor('openai-vision', {
       vision: { fetchImpl: vi.fn() },
     }).id).toBe('openai-vision')

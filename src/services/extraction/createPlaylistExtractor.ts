@@ -36,7 +36,7 @@ function providerUnavailable(id: string): PlaylistAnalysisError {
 }
 
 export function createPlaylistExtractor(
-  id: PlaylistExtractorId = 'browser-ocr',
+  id: PlaylistExtractorId = 'openai-vision',
   dependencies: PlaylistExtractorDependencies = {},
 ): PlaylistExtractor {
   if (id === 'browser-ocr') {

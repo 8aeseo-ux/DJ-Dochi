@@ -14,11 +14,13 @@ function EditableReview({
   onRetry = vi.fn(),
   onConfirm = vi.fn(),
   onRetryWithVision = vi.fn(),
+  onRetryWithOcr = vi.fn(),
   extractorId = 'browser-ocr',
 }: {
   onRetry?: () => void
   onConfirm?: () => void
   onRetryWithVision?: () => void
+  onRetryWithOcr?: () => void
   extractorId?: 'browser-ocr' | 'openai-vision'
 }) {
   const [result, setResult] = useState<PlaylistExtractionResult>({
@@ -51,6 +53,7 @@ function EditableReview({
       }))}
       onRetry={onRetry}
       onRetryWithVision={onRetryWithVision}
+      onRetryWithOcr={onRetryWithOcr}
       onConfirm={onConfirm}
       onChooseImage={vi.fn()}
       onChooseText={vi.fn()}
@@ -89,20 +92,23 @@ describe('PlaylistExtractionReview', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1)
   })
 
-  it('labels the active extractor and offers Vision only from browser OCR', async () => {
+  it('labels the active extractor and offers the alternate extractor', async () => {
     const user = userEvent.setup()
     const onRetryWithVision = vi.fn()
+    const onRetryWithOcr = vi.fn()
     const { rerender } = render(
-      <EditableReview onRetryWithVision={onRetryWithVision} />,
+      <EditableReview onRetryWithVision={onRetryWithVision} onRetryWithOcr={onRetryWithOcr} />,
     )
 
     expect(screen.getByText('기기에서 읽음')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'AI Vision으로 다시 읽기' }))
     expect(onRetryWithVision).toHaveBeenCalledTimes(1)
 
-    rerender(<EditableReview extractorId="openai-vision" />)
+    rerender(<EditableReview extractorId="openai-vision" onRetryWithOcr={onRetryWithOcr} />)
     expect(screen.getByText('AI Vision으로 읽음')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'AI Vision으로 다시 읽기' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '기기 OCR로 다시 읽기' }))
+    expect(onRetryWithOcr).toHaveBeenCalledTimes(1)
   })
 
   it('offers alternate input choices when no tracks were extracted', async () => {
@@ -119,6 +125,7 @@ describe('PlaylistExtractionReview', () => {
         onAddTrack={vi.fn()}
         onRetry={vi.fn()}
         onRetryWithVision={vi.fn()}
+        onRetryWithOcr={vi.fn()}
         onConfirm={vi.fn()}
         onChooseImage={onChooseImage}
         onChooseText={onChooseText}

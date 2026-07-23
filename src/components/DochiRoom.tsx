@@ -194,10 +194,16 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
 
           {state === 'extracting' && (
             <Panel className="playlist-extraction-status" role="status" aria-label="플레이리스트 이미지 분석 중">
-              <span className="screen-eyebrow">DOCHI OCR / READING</span>
+              <span className="screen-eyebrow">
+                {activeExtractorId === 'openai-vision' ? 'DOCHI VISION / READING' : 'DOCHI OCR / READING'}
+              </span>
               <div className="playlist-extraction-status__scan" aria-hidden="true"><i /><i /><i /></div>
               <strong>{getExtractionStatus(extractionProgress)}</strong>
-              <p>이미지는 이 기기 안에서만 읽고 있어요.</p>
+              <p>
+                {activeExtractorId === 'openai-vision'
+                  ? '이미지를 AI Vision으로 보내 곡 목록을 읽고 있어요.'
+                  : '이미지는 이 기기 안에서만 읽고 있어요.'}
+              </p>
             </Panel>
           )}
 
@@ -219,6 +225,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
               onAddTrack={actions.addExtractedTrack}
               onRetry={() => actions.retryExtraction()}
               onRetryWithVision={() => actions.retryExtraction('openai-vision')}
+              onRetryWithOcr={() => actions.retryExtraction('browser-ocr')}
               onConfirm={actions.confirmExtraction}
               onChooseImage={actions.chooseAnotherImage}
               onChooseText={actions.chooseTextAfterExtraction}
@@ -227,7 +234,9 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
 
           {state === 'extractionError' && extractionError && (
             <Panel className="playlist-extraction-error" role="alert" aria-label="플레이리스트 분석 오류">
-              <span className="screen-eyebrow">DOCHI OCR / ERROR</span>
+              <span className="screen-eyebrow">
+                {activeExtractorId === 'openai-vision' ? 'DOCHI VISION / ERROR' : 'DOCHI OCR / ERROR'}
+              </span>
               <h2>이미지를 읽지 못했어.</h2>
               <p>{extractionError.message}</p>
               <div className="playlist-extraction-error__actions">
@@ -242,12 +251,25 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
                     AI Vision으로 다시 읽기
                   </RetroButton>
                 )}
+                {activeExtractorId === 'openai-vision' && (
+                  <RetroButton
+                    variant="secondary"
+                    onClick={() => actions.retryExtraction('browser-ocr')}
+                  >
+                    기기 OCR로 다시 읽기
+                  </RetroButton>
+                )}
                 <RetroButton variant="ghost" onClick={actions.chooseAnotherImage}>다른 이미지 선택</RetroButton>
                 <RetroButton variant="ghost" onClick={actions.chooseTextAfterExtraction}>음악 목록 붙여넣기</RetroButton>
               </div>
               {activeExtractorId === 'browser-ocr' && (
                 <p className="playlist-extraction-error__vision-note">
                   AI Vision을 선택하면 이미지가 서버 분석을 위해 전송돼요.
+                </p>
+              )}
+              {activeExtractorId === 'openai-vision' && (
+                <p className="playlist-extraction-error__vision-note">
+                  기기 OCR은 서버로 이미지를 보내지 않고 브라우저에서 다시 읽어요.
                 </p>
               )}
             </Panel>

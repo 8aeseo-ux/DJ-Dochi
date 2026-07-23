@@ -15,10 +15,10 @@ const RESULT = {
 }
 
 describe('createPlaylistAnalysisService', () => {
-  it('delegates to browser OCR when no provider is specified', async () => {
+  it('delegates to AI Vision when no provider is specified', async () => {
     const extract = vi.fn(async () => RESULT)
     const factory = vi.fn((_id?: PlaylistExtractorId): PlaylistExtractor => ({
-      id: 'browser-ocr',
+      id: 'openai-vision',
       extract,
     }))
     const service = createPlaylistAnalysisService(factory)
@@ -26,7 +26,7 @@ describe('createPlaylistAnalysisService', () => {
 
     const result = await service(file)
 
-    expect(factory).toHaveBeenCalledWith('browser-ocr')
+    expect(factory).toHaveBeenCalledWith('openai-vision')
     expect(extract).toHaveBeenCalledWith(file, {
       signal: undefined,
       onProgress: undefined,

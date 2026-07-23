@@ -13,6 +13,7 @@ type PlaylistExtractionReviewProps = {
   onAddTrack: () => void
   onRetry: () => void
   onRetryWithVision: () => void
+  onRetryWithOcr: () => void
   onConfirm: () => void
   onChooseImage: () => void
   onChooseText: () => void
@@ -70,6 +71,7 @@ export default function PlaylistExtractionReview({
   onAddTrack,
   onRetry,
   onRetryWithVision,
+  onRetryWithOcr,
   onConfirm,
   onChooseImage,
   onChooseText,
@@ -80,7 +82,9 @@ export default function PlaylistExtractionReview({
   return (
     <Panel className="playlist-extraction-review" role="dialog" aria-label="추출한 음악 목록 확인">
       <div className="playlist-extraction-review__topline">
-        <span className="screen-eyebrow">DOCHI&apos;S DESK / OCR CHECK</span>
+        <span className="screen-eyebrow">
+          {extractorId === 'openai-vision' ? "DOCHI'S DESK / VISION CHECK" : "DOCHI'S DESK / OCR CHECK"}
+        </span>
         <div className="playlist-extraction-review__meta">
           <span className={`extraction-provider extraction-provider--${extractorId}`}>
             {extractorId === 'browser-ocr' ? '기기에서 읽음' : 'AI Vision으로 읽음'}
@@ -124,10 +128,20 @@ export default function PlaylistExtractionReview({
                 AI Vision으로 다시 읽기
               </RetroButton>
             )}
+            {extractorId === 'openai-vision' && (
+              <RetroButton variant="ghost" onClick={onRetryWithOcr}>
+                기기 OCR로 다시 읽기
+              </RetroButton>
+            )}
           </div>
           {extractorId === 'browser-ocr' && (
             <p className="playlist-extraction-review__vision-note">
               AI Vision을 선택하면 이미지가 서버 분석을 위해 전송돼요.
+            </p>
+          )}
+          {extractorId === 'openai-vision' && (
+            <p className="playlist-extraction-review__vision-note">
+              AI Vision으로 읽은 결과예요. 원하면 기기 OCR로 다시 시도할 수 있어요.
             </p>
           )}
           <div className="playlist-extraction-review__actions">
@@ -146,6 +160,11 @@ export default function PlaylistExtractionReview({
             {extractorId === 'browser-ocr' && (
               <RetroButton variant="ghost" onClick={onRetryWithVision}>
                 AI Vision으로 다시 읽기
+              </RetroButton>
+            )}
+            {extractorId === 'openai-vision' && (
+              <RetroButton variant="ghost" onClick={onRetryWithOcr}>
+                기기 OCR로 다시 읽기
               </RetroButton>
             )}
           </div>

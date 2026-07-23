@@ -307,11 +307,11 @@ describe('useDjDochiFlow', () => {
     expect(result.current.state).toBe('extracting')
     expect(result.current.dialogue?.text).toBe('어디 보자.')
     expect(extractPlaylistMock).toHaveBeenCalledWith(file, expect.objectContaining({
-      extractorId: 'browser-ocr',
+      extractorId: 'openai-vision',
       signal: expect.any(AbortSignal),
       onProgress: expect.any(Function),
     }))
-    expect(result.current.activeExtractorId).toBe('browser-ocr')
+    expect(result.current.activeExtractorId).toBe('openai-vision')
     expect(result.current.extractionProgress).toEqual({
       phase: 'recognizing',
       value: 0.4,
@@ -354,7 +354,7 @@ describe('useDjDochiFlow', () => {
 
     expect(result.current.state).toBe('extractionError')
     expect(result.current.extractionError).toMatchObject({ code: 'ANALYSIS_FAILED' })
-    expect(result.current.activeExtractorId).toBe('browser-ocr')
+    expect(result.current.activeExtractorId).toBe('openai-vision')
 
     act(() => result.current.actions.retryExtraction('openai-vision'))
     expect(result.current.state).toBe('extracting')
