@@ -4,3 +4,4 @@ docs/
 outputs/
 work/
 .superpowers/
+pnpm-workspace.yaml
