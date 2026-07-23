@@ -1,91 +1,72 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { extractPlaylistFromImage } from './playlistAnalysis'
+import { describe, expect, it, vi } from 'vitest'
+import type { PlaylistExtractor, PlaylistExtractorId } from './extraction/types'
+import { createPlaylistAnalysisService } from './playlistAnalysis'
 
-const VALID_RESULT = {
-  sourceApp: 'Spotify',
-  tracks: [
-    {
-      id: 'track-001',
-      title: 'Space Song',
-      artist: 'Beach House',
-      album: 'Depression Cherry',
-      confidence: 0.98,
-    },
-  ],
+const RESULT = {
+  sourceApp: 'Apple Music',
+  tracks: [{
+    id: 'track-001',
+    title: 'Car Crash',
+    artist: 'eaJ',
+    album: '',
+    confidence: 0.92,
+  }],
   warnings: [],
 }
 
-afterEach(() => {
-  vi.useRealTimers()
-})
-
-describe('extractPlaylistFromImage', () => {
-  it('sends the image file in multipart FormData', async () => {
-    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
-    const fetchImpl = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
-      expect(init?.method).toBe('POST')
-      expect(init?.body).toBeInstanceOf(FormData)
-      expect((init?.body as FormData).get('image')).toBe(file)
-      expect(init?.headers).toBeUndefined()
-      return new Response(JSON.stringify(VALID_RESULT), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    })
-
-    const result = await extractPlaylistFromImage(file, { fetchImpl })
-
-    expect(fetchImpl).toHaveBeenCalledWith('/api/extract-playlist', expect.any(Object))
-    expect(result.tracks[0].title).toBe('Space Song')
-  })
-
-  it('maps a structured API failure to PlaylistAnalysisError', async () => {
-    const file = new File(['playlist'], 'playlist.webp', { type: 'image/webp' })
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({
-      error: {
-        code: 'ANALYSIS_FAILED',
-        message: '지금은 이미지를 읽을 수 없어요.',
-        retryable: true,
-      },
-    }), { status: 502 }))
-
-    await expect(extractPlaylistFromImage(file, { fetchImpl })).rejects.toMatchObject({
-      code: 'ANALYSIS_FAILED',
-      message: '지금은 이미지를 읽을 수 없어요.',
-      retryable: true,
-    })
-  })
-
-  it('reports malformed success JSON as an invalid response', async () => {
-    const file = new File(['playlist'], 'playlist.jpg', { type: 'image/jpeg' })
-    const fetchImpl = vi.fn(async () => new Response(JSON.stringify({ tracks: 'broken' }), { status: 200 }))
-
-    await expect(extractPlaylistFromImage(file, { fetchImpl })).rejects.toMatchObject({
-      code: 'INVALID_RESPONSE',
-    })
-  })
-
-  it('reports network failures without exposing the original payload', async () => {
-    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
-    const fetchImpl = vi.fn(async () => { throw new TypeError('offline') })
-
-    await expect(extractPlaylistFromImage(file, { fetchImpl })).rejects.toMatchObject({
-      code: 'NETWORK_ERROR',
-      retryable: true,
-    })
-  })
-
-  it('aborts a request after the configured timeout', async () => {
-    vi.useFakeTimers()
-    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
-    const fetchImpl = vi.fn((_url: string | URL | Request, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+describe('createPlaylistAnalysisService', () => {
+  it('delegates to browser OCR when no provider is specified', async () => {
+    const extract = vi.fn(async () => RESULT)
+    const factory = vi.fn((_id?: PlaylistExtractorId): PlaylistExtractor => ({
+      id: 'browser-ocr',
+      extract,
     }))
+    const service = createPlaylistAnalysisService(factory)
+    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
 
-    const request = extractPlaylistFromImage(file, { fetchImpl, timeoutMs: 10 })
-    const rejection = expect(request).rejects.toMatchObject({ code: 'REQUEST_TIMEOUT', retryable: true })
-    await vi.advanceTimersByTimeAsync(11)
+    const result = await service(file)
 
-    await rejection
+    expect(factory).toHaveBeenCalledWith('browser-ocr')
+    expect(extract).toHaveBeenCalledWith(file, {
+      signal: undefined,
+      onProgress: undefined,
+    })
+    expect(result).toEqual(RESULT)
+  })
+
+  it('delegates to Vision only when its provider id is explicit', async () => {
+    const extract = vi.fn(async () => RESULT)
+    const factory = vi.fn((_id?: PlaylistExtractorId): PlaylistExtractor => ({
+      id: 'openai-vision',
+      extract,
+    }))
+    const service = createPlaylistAnalysisService(factory)
+    const file = new File(['playlist'], 'playlist.webp', { type: 'image/webp' })
+
+    await service(file, { extractorId: 'openai-vision' })
+
+    expect(factory).toHaveBeenCalledWith('openai-vision')
+    expect(extract).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards cancellation and progress to the selected adapter', async () => {
+    const extract = vi.fn(async () => RESULT)
+    const service = createPlaylistAnalysisService(() => ({
+      id: 'browser-ocr',
+      extract,
+    }))
+    const controller = new AbortController()
+    const onProgress = vi.fn()
+    const file = new File(['playlist'], 'playlist.jpg', { type: 'image/jpeg' })
+
+    await service(file, {
+      signal: controller.signal,
+      onProgress,
+    })
+
+    expect(extract).toHaveBeenCalledWith(file, {
+      signal: controller.signal,
+      onProgress,
+    })
   })
 })
