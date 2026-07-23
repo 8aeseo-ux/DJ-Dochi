@@ -10,9 +10,13 @@ describe('createLlmProvider', () => {
       apiKey: 'test-key',
       model: 'test-model',
       guidePrompt: 'Dochi guide',
+      tasteGuidePrompt: 'Taste guide',
+      curationGuidePrompt: 'Curation guide',
     })
 
     expect(provider.id).toBe('openai')
+    expect(provider.analyzeTaste).toEqual(expect.any(Function))
+    expect(provider.curateMixtape).toEqual(expect.any(Function))
   })
 
   it('rejects an unknown provider', () => {

@@ -8,6 +8,9 @@ export type MixtapeAnalysisErrorCode =
   | 'MISSING_MODEL'
   | 'CATALOG_UNAVAILABLE'
   | 'CATALOG_VERIFICATION_FAILED'
+  | 'TASTE_ANALYSIS_FAILED'
+  | 'CURATION_INVALID_RESPONSE'
+  | 'CURATION_FAILED'
   | 'ANALYSIS_FAILED'
 
 export type MixtapeAnalysisIssue = {

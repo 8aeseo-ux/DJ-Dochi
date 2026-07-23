@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/generate-mixtape.ts": {
-      "includeFiles": "prompts/dochi-mixtape-guide.md"
+      "includeFiles": "prompts/*.md"
     }
   }
 }

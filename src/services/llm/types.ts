@@ -34,6 +34,42 @@ export type LlmRequestOptions = {
   signal?: AbortSignal
 }
 
+export type TasteDiscoveryProfile = TasteProfile & {
+  searchKeywords: string[]
+}
+
+export type CurationCandidate = {
+  candidateId: string
+  title: string
+  artist: string
+}
+
+export type LlmMixtapeSelection = {
+  title: string
+  subtitle: string
+  dochiComment: string
+  design: TapeDesignMetadata
+  tracks: Array<{
+    candidateId: string
+    reason: string
+  }>
+}
+
+export interface CatalogSeededLlmProvider {
+  readonly id: string
+  analyzeTaste(
+    input: { tracks: readonly LlmTrackInput[] },
+    options?: LlmRequestOptions,
+  ): Promise<TasteDiscoveryProfile>
+  curateMixtape(
+    input: {
+      tasteProfile: TasteDiscoveryProfile
+      candidates: readonly CurationCandidate[]
+    },
+    options?: LlmRequestOptions,
+  ): Promise<LlmMixtapeSelection>
+}
+
 export interface LlmProvider {
   readonly id: string
   generateMixtape(
