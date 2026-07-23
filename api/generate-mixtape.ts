@@ -140,6 +140,13 @@ function logStage(
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, {
+        status: 204,
+        headers: { Allow: 'POST, OPTIONS' },
+      })
+    }
+
     if (request.method !== 'POST') {
       return json({
         error: {
@@ -148,7 +155,7 @@ export default {
           message: 'POST 요청만 사용할 수 있어요.',
           retryable: false,
         },
-      }, 405, { Allow: 'POST' })
+      }, 405, { Allow: 'POST, OPTIONS' })
     }
 
     let payload: unknown

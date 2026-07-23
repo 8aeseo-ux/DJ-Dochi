@@ -193,6 +193,13 @@ describe('POST /api/generate-mixtape', () => {
     delete process.env.OPENAI_MODEL
   })
 
+  it('accepts CORS preflight requests before creating providers', async () => {
+    const response = await handler.fetch(createRequest({}, 'OPTIONS'))
+
+    expect(response.status).toBe(204)
+    expect(createProviderMock).not.toHaveBeenCalled()
+  })
+
   it('rejects non-POST and invalid generation requests', async () => {
     const getResponse = await handler.fetch(createRequest({}, 'GET'))
     const invalidResponse = await handler.fetch(createRequest({ tracks: [] }))

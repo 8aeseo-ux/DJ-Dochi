@@ -38,6 +38,13 @@ describe('POST /api/extract-playlist', () => {
     delete process.env.OPENAI_API_KEY
   })
 
+  it('accepts CORS preflight requests without calling OpenAI', async () => {
+    const response = await handler.fetch(createRequest(undefined, 'OPTIONS'))
+
+    expect(response.status).toBe(204)
+    expect(extractWithOpenAIMock).not.toHaveBeenCalled()
+  })
+
   it('rejects non-POST requests', async () => {
     const response = await handler.fetch(createRequest(undefined, 'GET'))
 

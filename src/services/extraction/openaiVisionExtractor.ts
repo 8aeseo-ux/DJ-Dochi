@@ -8,6 +8,7 @@ import {
   parsePlaylistExtractionResult,
 } from '../../types/playlistAnalysis'
 import type { ExtractPlaylistOptions, PlaylistExtractor } from './types'
+import { resolveApiUrl } from '../../config/api'
 
 const ApiErrorSchema = z.object({
   error: z.object({
@@ -62,7 +63,7 @@ export function createOpenAiVisionExtractor(
         const body = new FormData()
         body.append('image', file)
 
-        const response = await fetchImpl('/api/extract-playlist', {
+        const response = await fetchImpl(resolveApiUrl('/api/extract-playlist'), {
           method: 'POST',
           body,
           signal: controller.signal,

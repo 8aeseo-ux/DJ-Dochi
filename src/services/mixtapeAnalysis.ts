@@ -1,6 +1,7 @@
 import { parseMixtapeResult, type ConfirmedTrack, type MixtapeResult } from '../types/mixtape'
 import { MixtapeAnalysisError } from '../types/mixtapeAnalysis'
 import type { MixtapeAnalysisIssue, MixtapeAnalysisStage } from '../types/mixtapeAnalysis'
+import { resolveApiUrl } from '../config/api'
 
 const DEFAULT_TIMEOUT_MS = 45_000
 
@@ -50,7 +51,7 @@ export async function generateMixtapeFromTracks(
   }
 
   try {
-    const response = await fetch('/api/generate-mixtape', {
+    const response = await fetch(resolveApiUrl('/api/generate-mixtape'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tracks }),
