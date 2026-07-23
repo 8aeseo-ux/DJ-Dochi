@@ -246,7 +246,10 @@ describe('useDjDochiFlow', () => {
   })
 
   it('extracts an image before entering the existing handoff flow', async () => {
-    extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
+    extractPlaylistMock.mockImplementation(async (_file, options) => {
+      options?.onProgress?.({ phase: 'recognizing', value: 0.4 })
+      return EXTRACTION_RESULT
+    })
     const { result } = renderHook(() => useDjDochiFlow())
     const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
 
@@ -257,7 +260,16 @@ describe('useDjDochiFlow', () => {
 
     expect(result.current.state).toBe('extracting')
     expect(result.current.dialogue?.text).toBe('어디 보자.')
-    expect(extractPlaylistMock).toHaveBeenCalledWith(file, expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    expect(extractPlaylistMock).toHaveBeenCalledWith(file, expect.objectContaining({
+      extractorId: 'browser-ocr',
+      signal: expect.any(AbortSignal),
+      onProgress: expect.any(Function),
+    }))
+    expect(result.current.activeExtractorId).toBe('browser-ocr')
+    expect(result.current.extractionProgress).toEqual({
+      phase: 'recognizing',
+      value: 0.4,
+    })
 
     await act(async () => { await Promise.resolve() })
 
@@ -271,7 +283,7 @@ describe('useDjDochiFlow', () => {
     expect(result.current.dialogue?.text).toBe('좋아.')
   })
 
-  it('moves to extractionError and can retry the same image', async () => {
+  it('moves to extractionError and can explicitly retry with Vision', async () => {
     extractPlaylistMock
       .mockRejectedValueOnce(new PlaylistAnalysisError({
         code: 'ANALYSIS_FAILED',
@@ -291,12 +303,17 @@ describe('useDjDochiFlow', () => {
 
     expect(result.current.state).toBe('extractionError')
     expect(result.current.extractionError).toMatchObject({ code: 'ANALYSIS_FAILED' })
+    expect(result.current.activeExtractorId).toBe('browser-ocr')
 
-    act(() => result.current.actions.retryExtraction())
+    act(() => result.current.actions.retryExtraction('openai-vision'))
     expect(result.current.state).toBe('extracting')
     await act(async () => { await Promise.resolve() })
     expect(result.current.state).toBe('extractionReview')
     expect(extractPlaylistMock).toHaveBeenCalledTimes(2)
+    expect(extractPlaylistMock).toHaveBeenLastCalledWith(file, expect.objectContaining({
+      extractorId: 'openai-vision',
+    }))
+    expect(result.current.activeExtractorId).toBe('openai-vision')
   })
 
   it('edits, deletes, and manually adds extracted tracks', async () => {

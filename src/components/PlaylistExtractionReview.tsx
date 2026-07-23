@@ -1,4 +1,5 @@
 import type { ExtractedTrack, PlaylistExtractionResult } from '../types/playlistAnalysis'
+import type { PlaylistExtractorId } from '../services/extraction/types'
 import Panel from './Panel'
 import RetroButton from './RetroButton'
 
@@ -6,10 +7,12 @@ type EditableTrackField = 'title' | 'artist'
 
 type PlaylistExtractionReviewProps = {
   result: PlaylistExtractionResult
+  extractorId: PlaylistExtractorId
   onTrackChange: (id: string, field: EditableTrackField, value: string) => void
   onDeleteTrack: (id: string) => void
   onAddTrack: () => void
   onRetry: () => void
+  onRetryWithVision: () => void
   onConfirm: () => void
   onChooseImage: () => void
   onChooseText: () => void
@@ -61,10 +64,12 @@ function TrackEditor({
 
 export default function PlaylistExtractionReview({
   result,
+  extractorId,
   onTrackChange,
   onDeleteTrack,
   onAddTrack,
   onRetry,
+  onRetryWithVision,
   onConfirm,
   onChooseImage,
   onChooseText,
@@ -76,7 +81,12 @@ export default function PlaylistExtractionReview({
     <Panel className="playlist-extraction-review" role="dialog" aria-label="추출한 음악 목록 확인">
       <div className="playlist-extraction-review__topline">
         <span className="screen-eyebrow">DOCHI&apos;S DESK / OCR CHECK</span>
-        <span>{result.sourceApp ?? 'UNKNOWN SOURCE'}</span>
+        <div className="playlist-extraction-review__meta">
+          <span className={`extraction-provider extraction-provider--${extractorId}`}>
+            {extractorId === 'browser-ocr' ? '기기에서 읽음' : 'AI Vision으로 읽음'}
+          </span>
+          <span>{result.sourceApp ?? 'UNKNOWN SOURCE'}</span>
+        </div>
       </div>
 
       <div className="playlist-extraction-review__heading">
@@ -109,7 +119,17 @@ export default function PlaylistExtractionReview({
           <div className="playlist-extraction-review__secondary-actions">
             <RetroButton variant="ghost" onClick={onAddTrack}>곡 직접 추가</RetroButton>
             <RetroButton variant="ghost" onClick={onRetry}>이미지 다시 분석</RetroButton>
+            {extractorId === 'browser-ocr' && (
+              <RetroButton variant="ghost" onClick={onRetryWithVision}>
+                AI Vision으로 다시 읽기
+              </RetroButton>
+            )}
           </div>
+          {extractorId === 'browser-ocr' && (
+            <p className="playlist-extraction-review__vision-note">
+              AI Vision을 선택하면 이미지가 서버 분석을 위해 전송돼요.
+            </p>
+          )}
           <div className="playlist-extraction-review__actions">
             <span>확인한 목록은 다음 믹스 단계에만 사용돼요.</span>
             <RetroButton onClick={onConfirm} disabled={!canConfirm}>이 목록이 맞아</RetroButton>
@@ -123,6 +143,11 @@ export default function PlaylistExtractionReview({
             <RetroButton onClick={onChooseImage}>다른 이미지 올리기</RetroButton>
             <RetroButton variant="secondary" onClick={onChooseText}>음악 목록 붙여넣기</RetroButton>
             <RetroButton variant="ghost" onClick={onRetry}>같은 이미지 다시 분석</RetroButton>
+            {extractorId === 'browser-ocr' && (
+              <RetroButton variant="ghost" onClick={onRetryWithVision}>
+                AI Vision으로 다시 읽기
+              </RetroButton>
+            )}
           </div>
         </div>
       )}

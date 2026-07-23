@@ -2082,6 +2082,29 @@ input:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+.playlist-extraction-review__meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.extraction-provider {
+  padding: 0.28rem 0.45rem;
+  color: var(--mint);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  border: 1px solid color-mix(in srgb, var(--mint) 55%, transparent);
+  background: color-mix(in srgb, var(--mint) 8%, transparent);
+}
+
+.extraction-provider--openai-vision {
+  color: var(--amber);
+  border-color: color-mix(in srgb, var(--amber) 55%, transparent);
+  background: color-mix(in srgb, var(--amber) 8%, transparent);
+}
+
 .playlist-extraction-review__heading {
   display: flex;
   align-items: center;
@@ -2164,6 +2187,13 @@ input:focus-visible {
 .playlist-extraction-review__secondary-actions {
   justify-content: flex-start;
   margin-bottom: 0.85rem;
+}
+
+.playlist-extraction-review__vision-note,
+.playlist-extraction-error__vision-note {
+  margin: -0.25rem 0 0.85rem;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .playlist-extraction-review__actions {

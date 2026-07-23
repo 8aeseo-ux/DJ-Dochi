@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { validatePlaylistImage } from '../config/playlistAnalysis'
 import type { SpinFeedbackBand, SpinMetrics } from '../lib/vinylPhysics'
 import { extractPlaylistFromImage } from '../services/playlistAnalysis'
+import type {
+  ExtractionProgress,
+  PlaylistExtractorId,
+} from '../services/extraction/types'
 import { PlaylistAnalysisError } from '../types/playlistAnalysis'
 import type {
   ExtractedTrack,
@@ -56,7 +60,7 @@ export type DjDochiFlowActions = {
   deleteInput: () => void
   closeInput: () => void
   handoff: () => void
-  retryExtraction: () => void
+  retryExtraction: (extractorId?: PlaylistExtractorId) => void
   updateExtractedTrack: (id: string, field: 'title' | 'artist', value: string) => void
   deleteExtractedTrack: (id: string) => void
   addExtractedTrack: () => void
@@ -87,6 +91,8 @@ export type DjDochiFlow = {
   inputError: PlaylistAnalysisIssue | null
   extractionResult: PlaylistExtractionResult | null
   extractionError: PlaylistAnalysisIssue | null
+  activeExtractorId: PlaylistExtractorId
+  extractionProgress: ExtractionProgress | null
   workMessage: string | null
   spinEnergy: number
   spinIntensity: number
@@ -120,6 +126,8 @@ export function useDjDochiFlow(): DjDochiFlow {
   const [inputError, setInputError] = useState<PlaylistAnalysisIssue | null>(null)
   const [extractionResult, setExtractionResult] = useState<PlaylistExtractionResult | null>(null)
   const [extractionError, setExtractionError] = useState<PlaylistAnalysisIssue | null>(null)
+  const [activeExtractorId, setActiveExtractorId] = useState<PlaylistExtractorId>('browser-ocr')
+  const [extractionProgress, setExtractionProgress] = useState<ExtractionProgress | null>(null)
   const [spinEnergy, setSpinEnergy] = useState(0)
   const [spinIntensity, setSpinIntensity] = useState(0)
   const [spinReaction, setSpinReaction] = useState<string | null>(null)
@@ -164,20 +172,34 @@ export function useDjDochiFlow(): DjDochiFlow {
           ? 'REC / Recording...'
           : null
 
-  const beginExtraction = (file: File) => {
+  const beginExtraction = (
+    file: File,
+    extractorId: PlaylistExtractorId = 'browser-ocr',
+  ) => {
     extractionControllerRef.current?.abort()
     const controller = new AbortController()
     extractionControllerRef.current = controller
     setExtractionResult(null)
     setExtractionError(null)
+    setActiveExtractorId(extractorId)
+    setExtractionProgress(null)
     setDialogueTrack('extracting')
     setDialogueIndex(0)
     setState('extracting')
 
-    void extractPlaylistFromImage(file, { signal: controller.signal })
+    void extractPlaylistFromImage(file, {
+      extractorId,
+      signal: controller.signal,
+      onProgress: (progress) => {
+        if (extractionControllerRef.current === controller && !controller.signal.aborted) {
+          setExtractionProgress(progress)
+        }
+      },
+    })
       .then((result) => {
         if (extractionControllerRef.current !== controller || controller.signal.aborted) return
         extractionControllerRef.current = null
+        setExtractionProgress(null)
         setExtractionResult(result)
         setDialogueTrack('extractionReview')
         setDialogueIndex(0)
@@ -186,6 +208,7 @@ export function useDjDochiFlow(): DjDochiFlow {
       .catch((error: unknown) => {
         if (extractionControllerRef.current !== controller || controller.signal.aborted) return
         extractionControllerRef.current = null
+        setExtractionProgress(null)
         const issue: PlaylistAnalysisIssue = error instanceof PlaylistAnalysisError
           ? { code: error.code, message: error.message, retryable: error.retryable }
           : {
@@ -206,6 +229,8 @@ export function useDjDochiFlow(): DjDochiFlow {
     setInputError(null)
     setExtractionResult(null)
     setExtractionError(null)
+    setActiveExtractorId('browser-ocr')
+    setExtractionProgress(null)
     setDialogueTrack(null)
     setDialogueIndex(0)
     setInputMode(mode)
@@ -287,11 +312,11 @@ export function useDjDochiFlow(): DjDochiFlow {
       setDialogueIndex(0)
       setState('receivingInput')
     },
-    retryExtraction: () => {
+    retryExtraction: (extractorId) => {
       if (state !== 'extractionReview' && state !== 'extractionError') return
       const file = inputRef.current.imageFile
       if (!file) returnToInput('image')
-      else beginExtraction(file)
+      else beginExtraction(file, extractorId ?? activeExtractorId)
     },
     updateExtractedTrack: (id, field, value) => {
       if (state !== 'extractionReview') return
@@ -420,6 +445,8 @@ export function useDjDochiFlow(): DjDochiFlow {
       setInputError(null)
       setExtractionResult(null)
       setExtractionError(null)
+      setActiveExtractorId('browser-ocr')
+      setExtractionProgress(null)
       setDialogueTrack(null)
       setDialogueIndex(0)
       setSpinEnergy(0)
@@ -496,6 +523,8 @@ export function useDjDochiFlow(): DjDochiFlow {
     inputError,
     extractionResult,
     extractionError,
+    activeExtractorId,
+    extractionProgress,
     workMessage,
     spinEnergy,
     spinIntensity,
