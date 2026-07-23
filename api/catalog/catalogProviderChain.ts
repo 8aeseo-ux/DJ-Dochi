@@ -22,6 +22,19 @@ export type CatalogProviderChain = {
   ): Promise<CatalogVerificationResult>
 }
 
+export type CatalogProviderPhases = CatalogProviderChain & {
+  verifyPrimary(
+    candidate: CatalogCandidate,
+    requestCache?: Map<string, CatalogVerificationResult>,
+    signal?: AbortSignal,
+  ): Promise<CatalogVerificationResult>
+  verifyFallback(
+    candidate: CatalogCandidate,
+    requestCache?: Map<string, CatalogVerificationResult>,
+    signal?: AbortSignal,
+  ): Promise<CatalogVerificationResult>
+}
+
 function combineUnverifiedResults(
   primary: CatalogVerificationResult,
   fallback: CatalogVerificationResult,
@@ -33,29 +46,73 @@ function combineUnverifiedResults(
   return { status: 'not_found' }
 }
 
+function providerCacheKey(
+  provider: CatalogVerificationProvider,
+  candidate: CatalogCandidate,
+): string {
+  return `${provider.id}:${trackIdentityKey(candidate)}`
+}
+
+function getCachedResult(
+  key: string,
+  requestCache: Map<string, CatalogVerificationResult> | undefined,
+  cache: TtlCache<string, CatalogVerificationResult>,
+): CatalogVerificationResult | undefined {
+  const requestCached = requestCache?.get(key)
+  if (requestCached) return requestCached
+
+  const sharedCached = cache.get(key)
+  if (sharedCached) requestCache?.set(key, sharedCached)
+  return sharedCached
+}
+
+async function verifyWithProvider(
+  provider: CatalogVerificationProvider,
+  candidate: CatalogCandidate,
+  requestCache: Map<string, CatalogVerificationResult> | undefined,
+  cache: TtlCache<string, CatalogVerificationResult>,
+  signal: AbortSignal | undefined,
+): Promise<CatalogVerificationResult> {
+  const key = providerCacheKey(provider, candidate)
+  const cached = getCachedResult(key, requestCache, cache)
+  if (cached) return cached
+
+  const result = await provider.verify(candidate, signal)
+  requestCache?.set(key, result)
+  if (result.status !== 'unavailable') cache.set(key, result)
+  return result
+}
+
 export function createCatalogProviderChain(options: {
   primary: CatalogVerificationProvider
   fallback: CatalogVerificationProvider
   cache?: TtlCache<string, CatalogVerificationResult>
-}): CatalogProviderChain {
+  }): CatalogProviderPhases {
   const cache = options.cache ?? defaultCatalogCache
+  const verifyPrimary = (
+    candidate: CatalogCandidate,
+    requestCache?: Map<string, CatalogVerificationResult>,
+    signal?: AbortSignal,
+  ) => verifyWithProvider(options.primary, candidate, requestCache, cache, signal)
+  const verifyFallback = (
+    candidate: CatalogCandidate,
+    requestCache?: Map<string, CatalogVerificationResult>,
+    signal?: AbortSignal,
+  ) => verifyWithProvider(options.fallback, candidate, requestCache, cache, signal)
 
   return {
+    verifyPrimary,
+    verifyFallback,
+
     async verify(candidate, requestCache, signal) {
       const key = trackIdentityKey(candidate)
-      const requestCached = requestCache?.get(key)
-      if (requestCached) return requestCached
+      const cached = getCachedResult(key, requestCache, cache)
+      if (cached) return cached
 
-      const sharedCached = cache.get(key)
-      if (sharedCached) {
-        requestCache?.set(key, sharedCached)
-        return sharedCached
-      }
-
-      const primaryResult = await options.primary.verify(candidate, signal)
+      const primaryResult = await verifyPrimary(candidate, requestCache, signal)
       const result = primaryResult.status === 'verified'
         ? primaryResult
-        : await options.fallback.verify(candidate, signal).then((fallbackResult) => (
+        : await verifyFallback(candidate, requestCache, signal).then((fallbackResult) => (
             fallbackResult.status === 'verified'
               ? fallbackResult
               : combineUnverifiedResults(primaryResult, fallbackResult)

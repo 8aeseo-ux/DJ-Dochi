@@ -48,6 +48,57 @@ function cache() {
 }
 
 describe('createCatalogProviderChain', () => {
+  it('exposes primary and fallback verification phases independently', async () => {
+    const primary = provider('itunes', [{ status: 'not_found' }])
+    const fallback = provider('musicbrainz', [{ status: 'not_found' }])
+    const chain = createCatalogProviderChain({ primary, fallback, cache: cache() })
+    const requestCache = new Map<string, CatalogVerificationResult>()
+    const signal = new AbortController().signal
+
+    await expect(chain.verifyPrimary(CANDIDATE, requestCache, signal)).resolves.toEqual({
+      status: 'not_found',
+    })
+    await expect(chain.verifyFallback(CANDIDATE, requestCache, signal)).resolves.toEqual({
+      status: 'not_found',
+    })
+
+    expect(primary.verify).toHaveBeenCalledWith(CANDIDATE, signal)
+    expect(fallback.verify).toHaveBeenCalledWith(CANDIDATE, signal)
+  })
+
+  it('keeps primary and fallback request caches separate', async () => {
+    const primary = provider('itunes', [{ status: 'not_found' }])
+    const fallback = provider('musicbrainz', [VERIFIED])
+    const chain = createCatalogProviderChain({ primary, fallback, cache: cache() })
+    const requestCache = new Map<string, CatalogVerificationResult>()
+
+    await chain.verifyPrimary(CANDIDATE, requestCache)
+    await expect(chain.verifyFallback(CANDIDATE, requestCache)).resolves.toEqual(VERIFIED)
+
+    expect(primary.verify).toHaveBeenCalledOnce()
+    expect(fallback.verify).toHaveBeenCalledOnce()
+  })
+
+  it('keeps primary and fallback shared cache entries separate', async () => {
+    const sharedCache = cache()
+    const primaryChain = createCatalogProviderChain({
+      primary: provider('itunes', [{ status: 'not_found' }]),
+      fallback: provider('musicbrainz', [{ status: 'not_found' }]),
+      cache: sharedCache,
+    })
+    const fallback = provider('musicbrainz', [VERIFIED])
+    const fallbackChain = createCatalogProviderChain({
+      primary: provider('itunes', [{ status: 'not_found' }]),
+      fallback,
+      cache: sharedCache,
+    })
+
+    await primaryChain.verifyPrimary(CANDIDATE)
+    await expect(fallbackChain.verifyFallback(CANDIDATE)).resolves.toEqual(VERIFIED)
+
+    expect(fallback.verify).toHaveBeenCalledOnce()
+  })
+
   it('stops after iTunes verifies a recommendation', async () => {
     const primary = provider('itunes', [VERIFIED])
     const fallback = provider('musicbrainz', [{ status: 'not_found' }])
