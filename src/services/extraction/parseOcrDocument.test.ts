@@ -121,4 +121,22 @@ describe('parseOcrDocument', () => {
       warnings: ['곡명과 아티스트가 함께 보이는 항목을 찾지 못했어요.'],
     })
   })
+
+  it('does not turn non-playlist UI labels into generic track rows', () => {
+    const result = parseOcrDocument(document([
+      word('개기', 180, 180, 250, 215),
+      word('70', 720, 180, 770, 215),
+      word('—', 180, 290, 220, 325),
+      word('DOCHI VISION / ERROR', 720, 290, 1040, 325),
+      word('다시 분석하기', 180, 400, 360, 435),
+      word('a', 720, 400, 745, 435),
+      word('음악 목록 붙여넣기', 180, 510, 440, 545),
+      word('A', 720, 510, 745, 545),
+    ]))
+
+    expect(result.tracks).toEqual([])
+    expect(result.warnings).toContain(
+      '곡명과 아티스트가 함께 보이는 항목을 찾지 못했어요.',
+    )
+  })
 })

@@ -39,6 +39,11 @@ function isHeaderLabel(value: string): boolean {
   return APPLE_HEADER_LABELS.has(value.toLocaleLowerCase())
 }
 
+function isPlausibleGenericField(value: string): boolean {
+  const searchable = value.replace(/[^\p{L}\p{N}]/gu, '')
+  return searchable.length >= 2 && !/^\p{N}+$/u.test(searchable)
+}
+
 function median(values: number[]): number {
   if (values.length === 0) return 0
   const sorted = [...values].sort((a, b) => a - b)
@@ -193,7 +198,12 @@ function parseGenericRows(document: OcrDocument, rows: OcrRow[]): UnnormalizedTr
     if (groups.length < 2) return []
     const title = joinWords(groups[0])
     const artist = joinWords(groups[1])
-    if (!title || !artist || isHeaderLabel(title) || isHeaderLabel(artist)) return []
+    if (
+      !isPlausibleGenericField(title)
+      || !isPlausibleGenericField(artist)
+      || isHeaderLabel(title)
+      || isHeaderLabel(artist)
+    ) return []
 
     return [{
       title,
