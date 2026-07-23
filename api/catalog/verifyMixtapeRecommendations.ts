@@ -135,7 +135,10 @@ export async function verifyMixtapeRecommendations(options: {
     options.draft,
     options.confirmedTracks,
   )
-  const targetCount = normalized.candidates.length
+  const targetCount = Math.min(
+    normalized.candidates.length,
+    MIXTAPE_PIPELINE.targetVerifiedTracks,
+  )
   const requestCache = new Map<string, CatalogVerificationResult>()
   const excluded = new Map<string, { title: string; artist: string }>()
   const verified = new Map<string, VerifiedCandidate>()
@@ -145,7 +148,7 @@ export async function verifyMixtapeRecommendations(options: {
 
   const shouldStopNewWork = () => (
     options.signal?.aborted === true
-    || verified.size >= MIXTAPE_PIPELINE.minimumVerifiedTracks
+    || verified.size >= MIXTAPE_PIPELINE.targetVerifiedTracks
     || (
       options.deadlineAt !== undefined
       && options.deadlineAt - now() <= MIXTAPE_PIPELINE.stopBufferMs
@@ -273,7 +276,7 @@ export async function verifyMixtapeRecommendations(options: {
     round <= MAX_REPLACEMENT_ROUNDS && !shouldStopNewWork();
     round += 1
   ) {
-    const count = MIXTAPE_PIPELINE.minimumVerifiedTracks - verified.size
+    const count = MIXTAPE_PIPELINE.targetVerifiedTracks - verified.size
     logger.info({
       event: 'replacement_request',
       round,

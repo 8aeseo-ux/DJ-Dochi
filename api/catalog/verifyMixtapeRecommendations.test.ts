@@ -142,15 +142,15 @@ function replacement(title: string): LlmMixtapeDraft['mixtape']['tracks'][number
 }
 
 describe('verifyMixtapeRecommendations', () => {
-  it('treats three verified tracks as success without requesting replacements', async () => {
+  it('continues catalog verification after three matches and stops at five', async () => {
     const provider = llm()
     const catalogProvider = catalog({
       primary: [
         verified('Myth', 'Beach House'),
         verified('Space Song', 'Beach House'),
         verified('Show Me How', 'Men I Trust'),
-        NOT_FOUND,
-        NOT_FOUND,
+        verified('Fake Song One', 'Fake Artist'),
+        verified('Fake Song Two', 'Fake Artist'),
       ],
     })
 
@@ -161,13 +161,14 @@ describe('verifyMixtapeRecommendations', () => {
       catalog: catalogProvider,
     })
 
-    expect(result.mixtape.tracks).toHaveLength(3)
+    expect(result.mixtape.tracks).toHaveLength(5)
     expect(result.mixtape.tracks.every((track) => track.catalogStatus === 'verified')).toBe(true)
     expect(provider.generateReplacementTracks).not.toHaveBeenCalled()
+    expect(catalogProvider.verifyPrimary).toHaveBeenCalledTimes(5)
     expect(catalogProvider.verifyFallback).not.toHaveBeenCalled()
   })
 
-  it('uses at most one replacement round to reach the three-track threshold', async () => {
+  it('uses one replacement round to fill the five-track target from three matches', async () => {
     const provider = llm([[
       replacement('Replacement One'),
       replacement('Replacement Two'),
@@ -176,12 +177,13 @@ describe('verifyMixtapeRecommendations', () => {
       primary: [
         verified('Myth', 'Beach House'),
         verified('Space Song', 'Beach House'),
-        NOT_FOUND,
+        verified('Show Me How', 'Men I Trust'),
         NOT_FOUND,
         NOT_FOUND,
         verified('Replacement One', 'Replacement Artist'),
+        verified('Replacement Two', 'Replacement Artist'),
       ],
-      fallback: [NOT_FOUND, NOT_FOUND, NOT_FOUND],
+      fallback: [NOT_FOUND, NOT_FOUND],
     })
 
     const result = await verifyMixtapeRecommendations({
@@ -193,7 +195,40 @@ describe('verifyMixtapeRecommendations', () => {
 
     expect(MAX_REPLACEMENT_ROUNDS).toBe(1)
     expect(provider.generateReplacementTracks).toHaveBeenCalledOnce()
-    expect(result.mixtape.tracks).toHaveLength(3)
+    expect(provider.generateReplacementTracks).toHaveBeenCalledWith(
+      expect.objectContaining({ count: 2 }),
+      expect.anything(),
+    )
+    expect(result.mixtape.tracks).toHaveLength(5)
+  })
+
+  it('returns four verified tracks after the single replacement round is exhausted', async () => {
+    const provider = llm([[
+      replacement('Replacement One'),
+      replacement('Replacement Two'),
+    ]])
+    const catalogProvider = catalog({
+      primary: [
+        verified('Myth', 'Beach House'),
+        verified('Space Song', 'Beach House'),
+        verified('Show Me How', 'Men I Trust'),
+        NOT_FOUND,
+        NOT_FOUND,
+        verified('Replacement One', 'Replacement Artist'),
+        NOT_FOUND,
+      ],
+      fallback: [NOT_FOUND, NOT_FOUND, NOT_FOUND],
+    })
+
+    const result = await verifyMixtapeRecommendations({
+      draft: DRAFT,
+      confirmedTracks: CONFIRMED_TRACKS,
+      llmProvider: provider,
+      catalog: catalogProvider,
+    })
+
+    expect(provider.generateReplacementTracks).toHaveBeenCalledOnce()
+    expect(result.mixtape.tracks).toHaveLength(4)
   })
 
   it('rejects when one replacement round still leaves fewer than three verified tracks', async () => {

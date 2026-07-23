@@ -1,6 +1,7 @@
 export const MIXTAPE_PIPELINE = {
   initialRecommendationCount: 5,
   maximumInitialRecommendations: 6,
+  targetVerifiedTracks: 5,
   minimumVerifiedTracks: 3,
   maximumReplacementRounds: 1,
   serverBudgetMs: 35_000,
