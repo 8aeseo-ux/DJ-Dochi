@@ -24,7 +24,11 @@
   ],
   "functions": {
     "api/generate-mixtape.ts": {
-      "includeFiles": "prompts/*.md"
+      "includeFiles": "prompts/*.md",
+      "maxDuration": 60
+    },
+    "api/extract-playlist.ts": {
+      "maxDuration": 60
     }
   }
 }
