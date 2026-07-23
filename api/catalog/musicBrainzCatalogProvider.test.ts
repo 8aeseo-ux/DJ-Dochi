@@ -22,6 +22,7 @@ function recording(overrides: Record<string, unknown> = {}) {
   return {
     id: 'f4a0d0d2-b6be-4ffe-8a86-8d6168839056',
     title: 'Ditto',
+    length: 185507,
     'artist-credit': [{ name: 'NewJeans' }],
     releases: [{ title: 'NewJeans 1st Single OMG' }],
     ...overrides,
@@ -51,6 +52,7 @@ describe('createMusicBrainzCatalogProvider', () => {
         artist: 'NewJeans',
         album: 'NewJeans 1st Single OMG',
         url: 'https://musicbrainz.org/recording/f4a0d0d2-b6be-4ffe-8a86-8d6168839056',
+        durationMs: 185507,
       },
     })
 
@@ -85,6 +87,20 @@ describe('createMusicBrainzCatalogProvider', () => {
       ...CANDIDATE,
       artist: 'NewJeans feat. Guest',
     })).resolves.toEqual({
+      status: 'ambiguous',
+      reason: 'version_mismatch',
+    })
+  })
+
+  it('uses MusicBrainz disambiguation text to reject alternate mixes', async () => {
+    const provider = createMusicBrainzCatalogProvider({
+      minIntervalMs: 0,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(musicBrainzResponse([
+        recording({ disambiguation: 'Dolby Atmos mix' }),
+      ])),
+    })
+
+    await expect(provider.verify(CANDIDATE)).resolves.toEqual({
       status: 'ambiguous',
       reason: 'version_mismatch',
     })

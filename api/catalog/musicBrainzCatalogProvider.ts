@@ -97,6 +97,9 @@ function parseRecordings(value: unknown): CatalogMatch[] | null {
 
     const artist = artistCreditName(recording['artist-credit'])
     if (!artist) return []
+    const version = typeof recording.disambiguation === 'string'
+      ? recording.disambiguation.trim()
+      : ''
 
     return [{
       provider: 'musicbrainz',
@@ -105,6 +108,8 @@ function parseRecordings(value: unknown): CatalogMatch[] | null {
       artist,
       album: firstReleaseTitle(recording.releases),
       url: `https://musicbrainz.org/recording/${encodeURIComponent(recording.id)}`,
+      durationMs: typeof recording.length === 'number' ? recording.length : null,
+      ...(version ? { version } : {}),
     }]
   })
 

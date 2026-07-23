@@ -12,6 +12,8 @@ export type CatalogMatch = {
   artist: string
   album: string
   url: string | null
+  durationMs?: number | null
+  version?: string
 }
 
 export type CatalogVerificationResult =

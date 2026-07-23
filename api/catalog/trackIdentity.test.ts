@@ -17,6 +17,7 @@ function match(
   title: string,
   artist: string,
   catalogId = `${artist}-${title}`,
+  durationMs?: number,
 ): CatalogMatch {
   return {
     provider: 'itunes',
@@ -25,6 +26,7 @@ function match(
     artist,
     album: 'Test Album',
     url: `https://music.apple.com/kr/song/${encodeURIComponent(catalogId)}`,
+    durationMs,
   }
 }
 
@@ -81,6 +83,26 @@ describe('selectCatalogMatch', () => {
       match('Home', 'Artist A', 'id-1'),
       match('Home', 'Artist A', 'id-2'),
     ])).toEqual({ status: 'ambiguous', reason: 'multiple_matches' })
+  })
+
+  it('treats duplicate releases with the same duration as one recording', () => {
+    expect(selectCatalogMatch(candidate('Ditto', '뉴진스'), [
+      match('Ditto', '뉴진스', 'single-release', 185_507),
+      match('Ditto', '뉴진스', 'album-release', 185_507),
+    ])).toMatchObject({
+      status: 'verified',
+      match: { catalogId: 'single-release' },
+    })
+  })
+
+  it('does not collapse a separately tagged mix into the original recording', () => {
+    expect(selectCatalogMatch(candidate('Ditto', 'NewJeans'), [{
+      ...match('Ditto', 'NewJeans', 'atmos-release', 185_507),
+      version: 'Dolby Atmos mix',
+    }])).toEqual({
+      status: 'ambiguous',
+      reason: 'version_mismatch',
+    })
   })
 
   it('returns not_found when the catalog returned no songs', () => {

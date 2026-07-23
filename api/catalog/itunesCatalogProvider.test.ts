@@ -25,6 +25,7 @@ function song(overrides: Record<string, unknown> = {}) {
     trackId: 1659513441,
     trackName: 'Ditto',
     artistName: 'NewJeans',
+    trackTimeMillis: 185507,
     collectionName: 'NewJeans 1st Single OMG',
     trackViewUrl: 'https://music.apple.com/kr/album/ditto/1659513440?i=1659513441',
     ...overrides,
@@ -49,6 +50,7 @@ describe('createItunesCatalogProvider', () => {
         artist: 'NewJeans',
         album: 'NewJeans 1st Single OMG',
         url: 'https://music.apple.com/kr/album/ditto/1659513440?i=1659513441',
+        durationMs: 185507,
       },
     })
 

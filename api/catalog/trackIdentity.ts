@@ -22,6 +22,7 @@ const VERSION_PATTERNS = [
   ['instrumental', /\b(?:instrumental)\b|인스트루멘털/iu],
   ['edit', /\b(?:radio edit|edit)\b|에디트/iu],
   ['version', /\b(?:version)\b|버전/iu],
+  ['mix', /\b(?:dolby atmos|mix)\b|믹스/iu],
 ] as const
 
 function normalizeText(value: string): string {
@@ -78,6 +79,24 @@ function diceCoefficient(left: string, right: string): number {
   return (2 * overlap) / (left.length + right.length - 2)
 }
 
+function equivalentRecordings(left: CatalogMatch, right: CatalogMatch): boolean {
+  if (
+    typeof left.durationMs !== 'number'
+    || typeof right.durationMs !== 'number'
+    || Math.abs(left.durationMs - right.durationMs) > 2_000
+  ) {
+    return false
+  }
+
+  return (
+    trackIdentityKey(left) === trackIdentityKey(right)
+    && setsEqual(
+      versionTokens(`${left.title} ${left.version ?? ''}`),
+      versionTokens(`${right.title} ${right.version ?? ''}`),
+    )
+  )
+}
+
 export function trackIdentityKey(
   track: Pick<CatalogCandidate, 'title' | 'artist'>,
 ): string {
@@ -94,6 +113,7 @@ export function selectCatalogMatch(
   const candidateArtist = normalizeText(candidate.artist)
   const candidateVersions = versionTokens(candidate.title)
   const scored = items.map((match) => {
+    const matchVersionText = `${match.title} ${match.version ?? ''}`
     const titleSimilarity = diceCoefficient(
       candidateTitle,
       normalizeText(stripVersionSegments(match.title)),
@@ -104,7 +124,7 @@ export function selectCatalogMatch(
     )
     const hasVersionMismatch = !setsEqual(
       candidateVersions,
-      versionTokens(match.title),
+      versionTokens(matchVersionText),
     )
 
     return {
@@ -123,7 +143,12 @@ export function selectCatalogMatch(
   ))
 
   if (accepted.length > 1 && accepted[0].score - accepted[1].score < MATCH_WINNER_MARGIN) {
-    return { status: 'ambiguous', reason: 'multiple_matches' }
+    const tied = accepted.filter(
+      (item) => accepted[0].score - item.score < MATCH_WINNER_MARGIN,
+    )
+    if (!tied.every((item) => equivalentRecordings(accepted[0].match, item.match))) {
+      return { status: 'ambiguous', reason: 'multiple_matches' }
+    }
   }
 
   if (accepted[0]) {

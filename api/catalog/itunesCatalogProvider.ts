@@ -37,6 +37,7 @@ function parseItunesSongs(value: unknown): CatalogMatch[] | null {
       artist: item.artistName,
       album: typeof item.collectionName === 'string' ? item.collectionName : '',
       url: typeof item.trackViewUrl === 'string' ? item.trackViewUrl : null,
+      durationMs: typeof item.trackTimeMillis === 'number' ? item.trackTimeMillis : null,
     }]
   })
 

@@ -87,8 +87,8 @@ At 390 × 844:
 
 ```text
 pnpm test
-31 test files passed
-134 tests passed
+45 test files passed
+205 tests passed
 
 pnpm build
 TypeScript passed
@@ -96,3 +96,23 @@ Vite production build passed
 ```
 
 The production output contains a separate `tesseractOcrEngine-*.js` chunk, confirming that the OCR engine is lazy-loaded instead of entering the initial DJ room bundle.
+
+## LLM taste analysis handoff
+
+- The browser OCR result remains in `extractionReview` until the user edits or confirms the list.
+- Only the confirmed `id`, `title`, `artist`, and `album` fields are sent to `/api/generate-mixtape`.
+- The endpoint selects the provider from `LLM_PROVIDER`, uses `OPENAI_MODEL`, and reads `OPENAI_API_KEY` only on the server.
+- OpenAI output is treated as recommendation candidates, not catalog truth. Input-track duplicates and repeated candidates are removed before verification.
+- Each candidate is searched in the credential-free iTunes Search API first. MusicBrainz is called only when iTunes cannot verify the candidate.
+- Catalog outcomes are separated into `verified`, `not_found`, `ambiguous`, and `unavailable`. Live, remix, remaster, and similarly versioned results are handled conservatively.
+- Only `catalogStatus: verified` tracks reach `FinalMixtape`. Failed slots are requested from the LLM again, with a maximum of two replacement rounds.
+- If no recommendation verifies, the endpoint returns a retryable catalog error and the client stays in `tasteAnalysisError`; the LP interaction does not start.
+- iTunes and MusicBrainz calls each have a four-second timeout. MusicBrainz calls are serialized with at least 1.1 seconds between request starts.
+- Normalized title+artist combinations use a request cache and a bounded six-hour warm-instance cache. Temporary `unavailable` outcomes are not retained in the long-lived cache.
+- Catalog logs include only provider, outcome, reason code, round, candidate index, requested count, and verified count. Track titles, artists, playlist contents, images, queries, and raw provider responses are not logged.
+- API/provider failure stays in `tasteAnalysisError` with retry and new-input actions; it does not silently show `DUMMY_MIX` in production.
+- `DUMMY_MIXTAPE_RESULT` is available only as a development-mode fallback so the fixed-room prototype remains testable without an API key.
+
+The catalog providers require no Spotify Client ID, Spotify Client Secret, Apple Developer Token, or Music User Token.
+
+To manually verify a live response, run the server-enabled Vercel dev command with `LLM_PROVIDER`, `OPENAI_MODEL`, and `OPENAI_API_KEY` set in the server environment. Confirm that the final rows are all `VERIFIED`, fabricated title+artist combinations are replaced or rejected, and different reviewed track lists produce different response titles or recommendation rows. Do not place the OpenAI key in a `VITE_` variable or print image/base64 data in logs.
