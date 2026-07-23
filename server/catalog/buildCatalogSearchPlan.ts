@@ -1,10 +1,10 @@
-import type { ConfirmedTrack } from '../../src/types/mixtape'
-import type { TasteDiscoveryProfile } from '../../src/services/llm/types'
-import { normalizeCatalogTerm, normalizeTasteTerms } from './catalogSearchVocabulary'
+import type { ConfirmedTrack } from '../../src/types/mixtape.js'
+import type { TasteDiscoveryProfile } from '../../src/services/llm/types.js'
+import { normalizeCatalogTerm, normalizeTasteTerms } from './catalogSearchVocabulary.js'
 import type {
   CatalogSearchPlan,
   CatalogSearchSeed,
-} from './types'
+} from './types.js'
 
 const MAXIMUM_BASE_SEEDS = 5
 

@@ -1,18 +1,18 @@
 import { readFileSync } from 'node:fs'
-import { GenerateMixtapeRequestSchema } from '../src/types/mixtape'
-import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis'
+import { GenerateMixtapeRequestSchema } from '../src/types/mixtape.js'
+import { MixtapeAnalysisError } from '../src/types/mixtapeAnalysis.js'
 import type {
   MixtapeAnalysisIssue,
   MixtapeAnalysisStage,
-} from '../src/types/mixtapeAnalysis'
-import { assembleVerifiedMixtape } from '../server/catalog/assembleVerifiedMixtape'
-import { buildCatalogSearchPlan } from '../server/catalog/buildCatalogSearchPlan'
-import { collectCatalogCandidates } from '../server/catalog/collectCatalogCandidates'
-import { createItunesCatalogProvider } from '../server/catalog/itunesCatalogProvider'
-import { createMusicBrainzCatalogProvider } from '../server/catalog/musicBrainzCatalogProvider'
-import { shortlistCatalogCandidates } from '../server/catalog/rankCatalogCandidates'
-import { createLlmProvider } from '../server/llm/provider'
-import { MIXTAPE_PIPELINE } from '../server/mixtapePipelineConfig'
+} from '../src/types/mixtapeAnalysis.js'
+import { assembleVerifiedMixtape } from '../server/catalog/assembleVerifiedMixtape.js'
+import { buildCatalogSearchPlan } from '../server/catalog/buildCatalogSearchPlan.js'
+import { collectCatalogCandidates } from '../server/catalog/collectCatalogCandidates.js'
+import { createItunesCatalogProvider } from '../server/catalog/itunesCatalogProvider.js'
+import { createMusicBrainzCatalogProvider } from '../server/catalog/musicBrainzCatalogProvider.js'
+import { shortlistCatalogCandidates } from '../server/catalog/rankCatalogCandidates.js'
+import { createLlmProvider } from '../server/llm/provider.js'
+import { MIXTAPE_PIPELINE } from '../server/mixtapePipelineConfig.js'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',

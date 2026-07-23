@@ -2,7 +2,7 @@ import type {
   CatalogCandidate,
   CatalogMatch,
   CatalogVerificationResult,
-} from './types'
+} from './types.js'
 
 type CatalogSelectionResult = Exclude<
   CatalogVerificationResult,

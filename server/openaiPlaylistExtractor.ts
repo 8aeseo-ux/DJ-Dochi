@@ -1,8 +1,8 @@
 import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { z } from 'zod'
-import { PlaylistAnalysisError } from '../src/types/playlistAnalysis'
-import type { PlaylistExtractionResult } from '../src/types/playlistAnalysis'
+import { PlaylistAnalysisError } from '../src/types/playlistAnalysis.js'
+import type { PlaylistExtractionResult } from '../src/types/playlistAnalysis.js'
 
 const OPENAI_PLAYLIST_MODEL = 'gpt-5.6-luna'
 const INCOMPLETE_TRACK_WARNING = '곡명과 아티스트를 모두 확인할 수 없는 항목은 제외했어요.'

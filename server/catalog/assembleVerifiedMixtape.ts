@@ -1,19 +1,19 @@
 import type {
   LlmMixtapeSelection,
   TasteDiscoveryProfile,
-} from '../../src/services/llm/types'
+} from '../../src/services/llm/types.js'
 import {
   parseMixtapeResult,
   type ConfirmedTrack,
   type MixtapeResult,
   type PlatformTrackReferences,
-} from '../../src/types/mixtape'
-import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
+} from '../../src/types/mixtape.js'
+import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis.js'
 import {
   artistIdentityKey,
   trackIdentityKey,
-} from './trackIdentity'
-import type { CatalogPoolTrack } from './types'
+} from './trackIdentity.js'
+import type { CatalogPoolTrack } from './types.js'
 
 type AssembleVerifiedMixtapeOptions = {
   tasteProfile: TasteDiscoveryProfile

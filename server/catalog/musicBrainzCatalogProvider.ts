@@ -1,6 +1,6 @@
-import { normalizeCatalogTerm } from './catalogSearchVocabulary'
-import { selectCatalogMatch } from './trackIdentity'
-import { TtlCache } from './ttlCache'
+import { normalizeCatalogTerm } from './catalogSearchVocabulary.js'
+import { selectCatalogMatch } from './trackIdentity.js'
+import { TtlCache } from './ttlCache.js'
 import type {
   CatalogDiscoveredTrack,
   CatalogDiscoveryProvider,
@@ -11,7 +11,7 @@ import type {
   CatalogVerificationProvider,
   CatalogVerificationResult,
   SimilarArtistSeedResolver,
-} from './types'
+} from './types.js'
 
 export const MUSICBRAINZ_TIMEOUT_MS = 4_000
 export const MUSICBRAINZ_MIN_INTERVAL_MS = 1_100

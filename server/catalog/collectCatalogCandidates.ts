@@ -1,12 +1,12 @@
-import type { ConfirmedTrack } from '../../src/types/mixtape'
-import type { TasteDiscoveryProfile } from '../../src/services/llm/types'
-import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig'
+import type { ConfirmedTrack } from '../../src/types/mixtape.js'
+import type { TasteDiscoveryProfile } from '../../src/services/llm/types.js'
+import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig.js'
 import {
   artistIdentityKey,
   hasUnsupportedVersion,
   normalizedCatalogText,
   trackIdentityKey,
-} from './trackIdentity'
+} from './trackIdentity.js'
 import type {
   CatalogCandidateCollection,
   CatalogDiscoveredTrack,
@@ -15,7 +15,7 @@ import type {
   CatalogSearchPlan,
   CatalogSearchSeed,
   SimilarArtistSeedResolver,
-} from './types'
+} from './types.js'
 
 export type CatalogDiscoveryHit = {
   seed: CatalogSearchSeed

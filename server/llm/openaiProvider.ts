@@ -4,14 +4,14 @@ import { z } from 'zod'
 import {
   TapeDesignMetadataSchema,
   TasteProfileSchema,
-} from '../../src/types/mixtape'
-import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
+} from '../../src/types/mixtape.js'
+import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis.js'
 import type {
   CurationCandidate,
   LlmMixtapeSelection,
   LlmProvider,
   TasteDiscoveryProfile,
-} from '../../src/services/llm/types'
+} from '../../src/services/llm/types.js'
 
 const TasteDiscoveryProfileSchema = TasteProfileSchema.extend({
   searchKeywords: z.array(z.string().min(1)).min(1).max(10),

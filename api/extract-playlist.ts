@@ -1,7 +1,7 @@
-import { validatePlaylistImage } from '../src/config/playlistAnalysis'
-import { PlaylistAnalysisError } from '../src/types/playlistAnalysis'
-import type { PlaylistAnalysisIssue } from '../src/types/playlistAnalysis'
-import { extractPlaylistWithOpenAI } from '../server/openaiPlaylistExtractor'
+import { validatePlaylistImage } from '../src/config/playlistAnalysis.js'
+import { PlaylistAnalysisError } from '../src/types/playlistAnalysis.js'
+import type { PlaylistAnalysisIssue } from '../src/types/playlistAnalysis.js'
+import { extractPlaylistWithOpenAI } from '../server/openaiPlaylistExtractor.js'
 
 const JSON_HEADERS = {
   'Cache-Control': 'no-store',

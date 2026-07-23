@@ -1,12 +1,12 @@
-import type { TasteDiscoveryProfile } from '../../src/services/llm/types'
-import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
-import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig'
-import { normalizeTasteTerms } from './catalogSearchVocabulary'
-import { artistIdentityKey } from './trackIdentity'
+import type { TasteDiscoveryProfile } from '../../src/services/llm/types.js'
+import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis.js'
+import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig.js'
+import { normalizeTasteTerms } from './catalogSearchVocabulary.js'
+import { artistIdentityKey } from './trackIdentity.js'
 import type {
   CatalogPoolTrack,
   CatalogSearchBucketKind,
-} from './types'
+} from './types.js'
 
 export const RELEVANCE_WEIGHTS = {
   sourceQuery: 0.35,

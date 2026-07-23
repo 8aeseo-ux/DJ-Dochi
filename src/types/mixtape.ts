@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { MixtapeAnalysisError } from './mixtapeAnalysis'
+import { MixtapeAnalysisError } from './mixtapeAnalysis.js'
 
 const nullableString = z.string().nullable()
 

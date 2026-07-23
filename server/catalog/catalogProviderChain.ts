@@ -1,10 +1,10 @@
-import { trackIdentityKey } from './trackIdentity'
-import { TtlCache } from './ttlCache'
+import { trackIdentityKey } from './trackIdentity.js'
+import { TtlCache } from './ttlCache.js'
 import type {
   CatalogCandidate,
   CatalogVerificationProvider,
   CatalogVerificationResult,
-} from './types'
+} from './types.js'
 
 const CATALOG_CACHE_TTL_MS = 6 * 60 * 60 * 1_000
 const CATALOG_CACHE_MAX_ENTRIES = 500

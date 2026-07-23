@@ -1,6 +1,6 @@
-import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
-import type { LlmProvider } from '../../src/services/llm/types'
-import { createOpenAiProvider } from './openaiProvider'
+import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis.js'
+import type { LlmProvider } from '../../src/services/llm/types.js'
+import { createOpenAiProvider } from './openaiProvider.js'
 
 export type LlmProviderEnvironment = {
   provider?: string
