@@ -68,6 +68,45 @@ describe('createOpenAiProvider', () => {
     expect(parseMock.mock.calls[0][0]).not.toHaveProperty('reasoning')
   })
 
+  it('bounds the initial mixtape recommendations to five or six tracks', async () => {
+    const provider = createOpenAiProvider({
+      apiKey: 'test-key',
+      model: 'gpt-4.1-mini',
+      guidePrompt: 'Dochi guide',
+    })
+
+    await provider.generateMixtape({
+      tracks: [{
+        title: 'Space Song',
+        artist: 'Beach House',
+        album: 'Depression Cherry',
+      }],
+    })
+
+    const request = parseMock.mock.calls[0][0]
+    expect(request.text.format.schema.properties.mixtape.properties.tracks)
+      .toMatchObject({ minItems: 5, maxItems: 6 })
+  })
+
+  it('forwards the caller cancellation signal to initial mixtape requests', async () => {
+    const provider = createOpenAiProvider({
+      apiKey: 'test-key',
+      model: 'gpt-4.1-mini',
+      guidePrompt: 'Dochi guide',
+    })
+    const signal = new AbortController().signal
+
+    await provider.generateMixtape({
+      tracks: [{
+        title: 'Space Song',
+        artist: 'Beach House',
+        album: 'Depression Cherry',
+      }],
+    }, { signal })
+
+    expect(parseMock.mock.calls[0][1]).toEqual({ signal })
+  })
+
   it('requests only the missing replacement tracks with confirmed and excluded identities', async () => {
     parseMock.mockResolvedValueOnce({
       output_parsed: {
@@ -119,6 +158,37 @@ describe('createOpenAiProvider', () => {
     })
   })
 
+  it('forwards the caller cancellation signal to replacement requests', async () => {
+    parseMock.mockResolvedValueOnce({
+      output_parsed: {
+        tracks: [{
+          title: 'Myth',
+          artist: 'Beach House',
+          album: 'Bloom',
+          reason: '몽환적인 질감이 자연스럽게 이어져.',
+        }],
+      },
+    })
+    const provider = createOpenAiProvider({
+      apiKey: 'test-key',
+      model: 'gpt-4.1-mini',
+      guidePrompt: 'Dochi guide',
+    })
+    const signal = new AbortController().signal
+
+    await provider.generateReplacementTracks({
+      confirmedTracks: [{
+        title: 'Ditto',
+        artist: 'NewJeans',
+        album: 'OMG',
+      }],
+      excludedTracks: [],
+      count: 1,
+    }, { signal })
+
+    expect(parseMock.mock.calls[0][1]).toEqual({ signal })
+  })
+
   it('keeps real-release and exclusion rules in the Dochi guide', () => {
     const guide = readFileSync(
       new URL('../../prompts/dochi-mixtape-guide.md', import.meta.url),
@@ -128,5 +198,6 @@ describe('createOpenAiProvider', () => {
     expect(guide).toContain('실제로 발매')
     expect(guide).toContain('제외 목록')
     expect(guide).toContain('확신하지 못하는')
+    expect(guide).toContain('정확히 5곡')
   })
 })

@@ -30,10 +30,18 @@ export type ReplacementRecommendationInput = {
   count: number
 }
 
+export type LlmRequestOptions = {
+  signal?: AbortSignal
+}
+
 export interface LlmProvider {
   readonly id: string
-  generateMixtape(input: { tracks: readonly LlmTrackInput[] }): Promise<LlmMixtapeDraft>
+  generateMixtape(
+    input: { tracks: readonly LlmTrackInput[] },
+    options?: LlmRequestOptions,
+  ): Promise<LlmMixtapeDraft>
   generateReplacementTracks(
     input: ReplacementRecommendationInput,
+    options?: LlmRequestOptions,
   ): Promise<LlmRecommendationDraft[]>
 }

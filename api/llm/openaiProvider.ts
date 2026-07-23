@@ -2,6 +2,7 @@ import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { z } from 'zod'
 import { MixtapeAnalysisError } from '../../src/types/mixtapeAnalysis'
+import { MIXTAPE_PIPELINE } from '../mixtapePipelineConfig'
 import type {
   LlmMixtapeDraft,
   LlmProvider,
@@ -32,7 +33,9 @@ const LlmMixtapeDraftSchema = z.object({
       texture: z.string(),
       motifs: z.array(z.string()),
     }).strict(),
-    tracks: z.array(LlmRecommendationTrackSchema),
+    tracks: z.array(LlmRecommendationTrackSchema)
+      .min(MIXTAPE_PIPELINE.initialRecommendationCount)
+      .max(MIXTAPE_PIPELINE.maximumInitialRecommendations),
   }).strict(),
 }).strict()
 
@@ -63,7 +66,7 @@ export function createOpenAiProvider({
 
   return {
     id: 'openai',
-    async generateMixtape({ tracks }): Promise<LlmMixtapeDraft> {
+    async generateMixtape({ tracks }, options): Promise<LlmMixtapeDraft> {
       try {
         const response = await client.responses.parse({
           model,
@@ -86,7 +89,7 @@ export function createOpenAiProvider({
           text: {
             format: zodTextFormat(LlmMixtapeDraftSchema, 'dochi_mixtape_draft'),
           },
-        })
+        }, { signal: options?.signal })
 
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
@@ -113,7 +116,7 @@ export function createOpenAiProvider({
       confirmedTracks,
       excludedTracks,
       count,
-    }): Promise<LlmRecommendationDraft[]> {
+    }, options): Promise<LlmRecommendationDraft[]> {
       try {
         const response = await client.responses.parse({
           model,
@@ -153,7 +156,7 @@ Replacement mode:
           text: {
             format: zodTextFormat(ReplacementTracksSchema, 'dochi_replacement_tracks'),
           },
-        })
+        }, { signal: options?.signal })
 
         if (!response.output_parsed) {
           throw new MixtapeAnalysisError({
