@@ -109,6 +109,15 @@ describe('music sketchbook work note theme', () => {
     expect(themeCss).not.toContain('.room-interface')
   })
 
+  it('uses lighter, smaller typography for dialogue and choice labels', () => {
+    expect(ruleFor('.dialogue-box__line')).toContain(
+      'font-size: clamp(1.05rem, 1.85vw, 1.5rem)',
+    )
+    expect(ruleFor('.dialogue-box__line')).toContain('font-weight: 500')
+    expect(ruleFor('.choice-menu .retro-button')).toContain('font-size: 0.9rem')
+    expect(ruleFor('.choice-menu .retro-button')).toContain('font-weight: 500')
+  })
+
   it('keeps the original open upload and hand-drawn action treatment', () => {
     expect(themeCss).toContain('.file-dropzone,')
     expect(ruleFor('.file-dropzone')).toContain('border-style: dashed')

@@ -297,7 +297,8 @@ body {
 }
 
 .dialogue-box__line {
-  font-size: clamp(1.25rem, 2.2vw, 1.8rem);
+  font-size: clamp(1.05rem, 1.85vw, 1.5rem);
+  font-weight: 500;
   line-height: 1.35;
 }
 
@@ -388,6 +389,8 @@ body {
 
 .choice-menu .retro-button {
   background: var(--sketch-paper-bright);
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 
 .choice-menu .retro-button:hover:not(:disabled) {
