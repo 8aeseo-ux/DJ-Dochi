@@ -13,6 +13,13 @@ const workshopDoodles = existsSync(workshopDoodlesUrl)
   ? readFileSync(workshopDoodlesUrl, 'utf8')
   : ''
 
+function ruleFor(selector: string) {
+  const start = themeCss.indexOf(`${selector} {`)
+  if (start < 0) return ''
+  const end = themeCss.indexOf('}', start)
+  return themeCss.slice(start, end + 1)
+}
+
 describe('music sketchbook work note theme', () => {
   it('loads local Gothic UI text before decorative handwriting and theme overrides', () => {
     expect(indexCss).toContain("@import 'pretendard/dist/web/static/pretendard.css'")
@@ -69,6 +76,18 @@ describe('music sketchbook work note theme', () => {
     ]) {
       expect(themeCss).toContain(selector)
     }
+  })
+
+  it('keeps scene decoration inside the visual layer and the UI on opaque paper', () => {
+    expect(ruleFor('.room-visual::after')).toContain('opacity: 0.14')
+    expect(ruleFor('.room-interface')).toContain('background: var(--sketch-paper-bright)')
+    expect(ruleFor('.room-interface--empty')).toContain('display: none')
+  })
+
+  it('keeps upload and action surfaces clean and readable', () => {
+    expect(ruleFor('.file-dropzone')).toContain('background: var(--sketch-paper-bright)')
+    expect(ruleFor('.file-dropzone')).not.toContain('gradient')
+    expect(ruleFor('.retro-button')).toContain('min-height: 44px')
   })
 
   it('includes interaction and accessibility safeguards', () => {

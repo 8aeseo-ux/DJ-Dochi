@@ -153,7 +153,7 @@ body {
   pointer-events: none;
 }
 
-.room-stage::after {
+.room-visual::after {
   content: "";
   position: absolute;
   inset: 4.5rem 1.5rem 1.2rem;
@@ -161,7 +161,7 @@ body {
   color: var(--sketch-ink);
   background: url('../assets/sketch/workshop-doodles.svg') center / contain no-repeat;
   border: 0;
-  opacity: 0.48;
+  opacity: 0.14;
   transform: none;
   pointer-events: none;
 }
@@ -439,6 +439,7 @@ body {
 }
 
 .file-dropzone {
+  background: var(--sketch-paper-bright);
   border-style: dashed;
 }
 
@@ -1005,6 +1006,228 @@ select,
   font-family: var(--font-note);
 }
 
+.room-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 58fr) minmax(22rem, 42fr);
+  min-height: 44rem;
+  overflow: hidden;
+}
+
+.room-stage:not(.room-stage--with-interface) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.room-visual {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 44rem;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.room-visual::before {
+  top: 3.7rem;
+  left: clamp(1.25rem, 6vw, 4.5rem);
+  opacity: 0.16;
+}
+
+.room-visual::after {
+  inset: 3.5rem 1rem 1rem;
+}
+
+.room-interface {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+  max-height: 44rem;
+  padding: clamp(1.25rem, 2.4vw, 2.2rem);
+  overflow: auto;
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  border-left: 1.5px solid var(--sketch-ink);
+  box-shadow: -0.3rem 0 0 rgba(35, 34, 31, 0.035);
+}
+
+.room-interface--empty {
+  display: none;
+}
+
+.room-interface > .dialogue-box,
+.room-interface > .choice-menu,
+.room-interface > .playlist-input-panel,
+.room-interface > .playlist-extraction-review,
+.room-interface > .playlist-extraction-status,
+.room-interface > .playlist-extraction-error,
+.room-interface > .taste-analysis-status,
+.room-interface > .taste-analysis-error {
+  position: relative;
+  inset: auto;
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: none;
+  margin: 0;
+  transform: none;
+}
+
+.room-interface > .dialogue-box {
+  min-height: 8.5rem;
+  padding: 1.1rem 0.25rem 1rem;
+  overflow: visible;
+}
+
+.room-interface > .choice-menu {
+  grid-template-columns: minmax(0, 1fr);
+  padding-top: 0;
+}
+
+.room-interface > .playlist-input-panel,
+.room-interface > .playlist-extraction-review,
+.room-interface > .playlist-extraction-status,
+.room-interface > .playlist-extraction-error,
+.room-interface > .taste-analysis-status,
+.room-interface > .taste-analysis-error {
+  padding: 1rem 0;
+  overflow: visible;
+}
+
+.room-vinyl-status {
+  display: grid;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1.25rem;
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  border: 1.5px solid var(--sketch-ink);
+  border-radius: 8px 5px 9px 6px / 6px 9px 5px 8px;
+}
+
+.room-vinyl-status strong {
+  font-size: clamp(1.15rem, 1.5vw, 1.45rem);
+  line-height: 1.5;
+}
+
+.room-vinyl-status__track {
+  display: block;
+  height: 0.8rem;
+  overflow: hidden;
+  background: var(--sketch-paper-warm);
+  border: 1.5px solid var(--sketch-ink);
+  border-radius: 999px;
+}
+
+.room-vinyl-status__track i {
+  display: block;
+  height: 100%;
+  background: var(--sketch-green);
+  transition: width 120ms linear;
+}
+
+.room-visual .vinyl-interaction__hint,
+.room-visual .vinyl-energy,
+.room-visual .vinyl-interaction__recording-label {
+  display: none;
+}
+
+.room-character {
+  bottom: 20%;
+  left: 5%;
+  width: min(92%, 32rem);
+}
+
+.room-controller-layer {
+  right: 10%;
+  bottom: 3%;
+  left: 10%;
+}
+
+.room-controller {
+  width: min(100%, 38rem);
+}
+
+.room-workbench {
+  right: 5%;
+  bottom: 9%;
+  left: 5%;
+}
+
+.room-wall-mark {
+  opacity: 0.18;
+}
+
+.room-stage--with-interface .room-footer {
+  display: none;
+}
+
+.dialogue-box__line {
+  font-size: clamp(1.25rem, 1.7vw, 1.5rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.55;
+}
+
+.retro-button {
+  min-height: 44px;
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.35;
+  transform: rotate(-0.06deg);
+}
+
+.retro-button:nth-of-type(even) {
+  transform: rotate(0.06deg);
+}
+
+.retro-button--primary {
+  background: #f4bbb3;
+}
+
+.retro-button--secondary {
+  background: #f2dfa0;
+}
+
+.retro-button--ghost {
+  background: var(--sketch-paper-bright);
+}
+
+.retro-button:hover:not(:disabled),
+.platform-listen__button:hover,
+.final-mixtape__platform-button:hover {
+  background: #f7ebbb;
+  transform: translate(-1px, 1px) rotate(0.08deg);
+}
+
+.file-dropzone,
+.upload-card,
+.paste-area,
+.playlist-input-panel textarea,
+.playlist-extraction-review input,
+.playlist-extraction-review textarea,
+.extraction-track-row,
+.extraction-empty-state {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+}
+
+.file-dropzone {
+  background-image: none;
+}
+
+.playlist-input-panel,
+.playlist-extraction-review,
+.playlist-extraction-status,
+.playlist-extraction-error,
+.taste-analysis-status,
+.taste-analysis-error {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+}
+
 button:focus-visible,
 textarea:focus-visible,
 input:focus-visible,
@@ -1027,13 +1250,13 @@ a:focus-visible,
     min-height: clamp(39rem, 138vw, 49rem);
   }
 
-  .room-stage::before {
+  .room-visual::before {
     top: 3.7rem;
     left: 1.2rem;
     font-size: 0.8rem;
   }
 
-  .room-stage::after {
+  .room-visual::after {
     inset: 3.9rem 0.2rem 1.4rem;
     opacity: 0.37;
   }
