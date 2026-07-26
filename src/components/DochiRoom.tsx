@@ -93,6 +93,18 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
   const isLastDialogueLine = dialogue !== null && dialogue.index === dialogue.total - 1
   const isPhotoPromptChoice = state === 'photoPrompt' && isLastDialogueLine
   const isFinalTapeChoice = state === 'finalTape' && isLastDialogueLine
+  const hasRoomInterface =
+    Boolean(dialogue) ||
+    isMixing ||
+    (state === 'choosingInput' && !inputMode) ||
+    Boolean(inputMode) ||
+    state === 'extracting' ||
+    isAnalyzingTaste ||
+    (state === 'extractionReview' && Boolean(extractionResult)) ||
+    (state === 'extractionError' && Boolean(extractionError)) ||
+    (state === 'tasteAnalysisError' && Boolean(tasteAnalysisError)) ||
+    isPhotoPromptChoice ||
+    isFinalTapeChoice
   const roomStyle = {
     '--mix-energy': spinEnergy,
     '--mix-intensity': spinIntensity,
@@ -113,61 +125,92 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
           <div className="topbar__status"><span className="status-dot" aria-hidden="true" /> ROOM 01 / ON AIR</div>
         </header>
 
-        <main className={`room-stage room-stage--${state} ${isOverdrive ? 'room-stage--overdrive' : ''}`.trim()} style={roomStyle}>
-          <div className="room-wall-mark" aria-hidden="true"><span>DOCHI</span><span>FM</span></div>
-          <div className="room-grid-glow" aria-hidden="true" />
+        <main
+          className={`room-stage room-stage--${state} ${hasRoomInterface ? 'room-stage--with-interface' : ''} ${isOverdrive ? 'room-stage--overdrive' : ''}`.trim()}
+          style={roomStyle}
+        >
+          <section className="room-visual" aria-label="DJ 도치 작업실 장면">
+            <div className="room-wall-mark" aria-hidden="true"><span>DOCHI</span><span>FM</span></div>
+            <div className="room-grid-glow" aria-hidden="true" />
 
-          <section className="room-workbench" aria-label="도치의 DJ 작업대">
-            <div className="room-speaker room-speaker--left" aria-hidden="true"><i /><i /><i /></div>
-            <div className="room-console" aria-hidden="true"><span>DD / 001</span><span>LOCAL MIX</span><i /><i /><i /></div>
-            <div className="room-speaker room-speaker--right" aria-hidden="true"><i /><i /><i /></div>
-            <Equalizer compact />
+            <section className="room-workbench" aria-label="도치의 DJ 작업대">
+              <div className="room-speaker room-speaker--left" aria-hidden="true"><i /><i /><i /></div>
+              <div className="room-console" aria-hidden="true"><span>DD / 001</span><span>LOCAL MIX</span><i /><i /><i /></div>
+              <div className="room-speaker room-speaker--right" aria-hidden="true"><i /><i /><i /></div>
+              <Equalizer compact />
+            </section>
+
+            <WorkshopEffects
+              active={isMixing || isExtracting}
+              message={workMessage}
+              energy={spinEnergy}
+              intensity={spinIntensity}
+              nearCompletion={spinEnergy >= 0.8}
+              recording={isRecording}
+            />
+
+            <div className={`room-character room-character--${state}`}>
+              <DochiCharacter
+                pose={getPose(state)}
+                size="hero"
+                motion={getMotion(state)}
+                visible={state !== 'leaving'}
+                interactive={state === 'idle'}
+                onClick={actions.notice}
+              />
+            </div>
+            <div className="room-controller-layer">
+              <DjController />
+            </div>
+            {state === 'working' && spinReaction && (
+              <div
+                className={`spin-reaction ${isOverdrive ? 'spin-reaction--overdrive' : ''}`.trim()}
+                role="status"
+                aria-label="도치의 회전 반응"
+              >
+                {spinReaction}
+              </div>
+            )}
+            {isMixing && (
+              <VinylInteraction
+                phase={vinylPhase}
+                onComplete={actions.completeSpin}
+                onSpinEnergy={actions.updateSpinEnergy}
+                onSpinMetrics={actions.updateSpinMetrics}
+              />
+            )}
+            {state === 'idle' && <span className="idle-hint">도치를 눌러보세요</span>}
           </section>
 
-          <WorkshopEffects
-            active={isMixing || isExtracting}
-            message={workMessage}
-            energy={spinEnergy}
-            intensity={spinIntensity}
-            nearCompletion={spinEnergy >= 0.8}
-            recording={isRecording}
-          />
+          <section
+            className={`room-interface ${hasRoomInterface ? '' : 'room-interface--empty'}`.trim()}
+            aria-hidden={!hasRoomInterface}
+          >
+            {isMixing && (
+              <div
+                className={`room-vinyl-status room-vinyl-status--${vinylPhase}`}
+                role="status"
+                aria-label="LP 작업 안내"
+              >
+                <span className="screen-eyebrow">DOCHI MIX / LIVE</span>
+                <strong>
+                  {state === 'working'
+                    ? 'LP를 힘껏 밀고 놓아봐.'
+                    : state === 'recording'
+                      ? '테이프에 녹음하는 중...'
+                      : '좋아. 이제 녹음할게.'}
+                </strong>
+                {state === 'working' && (
+                  <span className="room-vinyl-status__track" aria-hidden="true">
+                    <i style={{ width: `${Math.round(spinEnergy * 100)}%` }} />
+                  </span>
+                )}
+              </div>
+            )}
 
-          <div className={`room-character room-character--${state}`}>
-            <DochiCharacter
-              pose={getPose(state)}
-              size="hero"
-              motion={getMotion(state)}
-              visible={state !== 'leaving'}
-              interactive={state === 'idle'}
-              onClick={actions.notice}
-            />
-          </div>
-          <div className="room-controller-layer">
-            <DjController />
-          </div>
-          {state === 'working' && spinReaction && (
-            <div
-              className={`spin-reaction ${isOverdrive ? 'spin-reaction--overdrive' : ''}`.trim()}
-              role="status"
-              aria-label="도치의 회전 반응"
-            >
-              {spinReaction}
-            </div>
-          )}
-          {isMixing && (
-            <VinylInteraction
-              phase={vinylPhase}
-              onComplete={actions.completeSpin}
-              onSpinEnergy={actions.updateSpinEnergy}
-              onSpinMetrics={actions.updateSpinMetrics}
-            />
-          )}
-          {state === 'idle' && <span className="idle-hint">도치를 눌러보세요</span>}
-
-          {dialogue && (
-            <DialogueBox line={dialogue.text} dialogueKey={dialogueKey} onAdvance={actions.advanceDialogue} />
-          )}
+            {dialogue && (
+              <DialogueBox line={dialogue.text} dialogueKey={dialogueKey} onAdvance={actions.advanceDialogue} />
+            )}
 
           {state === 'choosingInput' && !inputMode && (
             <ChoiceMenu
@@ -284,14 +327,24 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             />
           )}
 
-          {isPhotoPromptChoice && (
-            <ChoiceMenu
-              items={[
-                { label: '기념사진 찍기', onSelect: actions.acceptPhoto },
-                { label: '그냥 받을게', onSelect: actions.skipPhoto, variant: 'secondary' },
-              ]}
-            />
-          )}
+            {isPhotoPromptChoice && (
+              <ChoiceMenu
+                items={[
+                  { label: '기념사진 찍기', onSelect: actions.acceptPhoto },
+                  { label: '그냥 받을게', onSelect: actions.skipPhoto, variant: 'secondary' },
+                ]}
+              />
+            )}
+
+            {isFinalTapeChoice && (
+              <ChoiceMenu
+                items={[
+                  { label: '믹스테이프 열기', onSelect: actions.openTape },
+                  { label: '다시 부탁하기', onSelect: actions.restart, variant: 'secondary' },
+                ]}
+              />
+            )}
+          </section>
 
           {state === 'cameraPreview' && (
             <CameraCapture
@@ -311,15 +364,6 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
 
           {state === 'polaroidMaking' && (
             <PolaroidComposer userPhotoUrl={capturedPhotoUrl} onComplete={actions.completePolaroid} />
-          )}
-
-          {isFinalTapeChoice && (
-            <ChoiceMenu
-              items={[
-                { label: '믹스테이프 열기', onSelect: actions.openTape },
-                { label: '다시 부탁하기', onSelect: actions.restart, variant: 'secondary' },
-              ]}
-            />
           )}
 
           {isTapeAvailable && renderedMixtape && (
