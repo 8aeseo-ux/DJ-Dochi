@@ -1,5 +1,7 @@
 # DJ DOCHI Sketchbook Work Note Theme Implementation Plan
 
+> **Superseded:** The final visual references removed ruled notebook lines and repeated small doodles from the approved direction. Execute `docs/superpowers/plans/2026-07-26-sketchbook-work-note-theme-v2.md` instead.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the existing paper-collage theme with one continuous hand-drawn music work-note page while preserving every DJ DOCHI state, interaction, API flow, and responsive layout.
