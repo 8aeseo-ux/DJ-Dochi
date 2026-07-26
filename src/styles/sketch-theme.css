@@ -386,6 +386,20 @@ body {
   background: transparent;
 }
 
+.choice-menu .retro-button {
+  background: var(--sketch-paper-bright);
+}
+
+.choice-menu .retro-button:hover:not(:disabled) {
+  background:
+    linear-gradient(
+      transparent 64%,
+      rgba(216, 185, 79, 0.4) 64% 88%,
+      transparent 88%
+    ),
+    var(--sketch-paper-bright);
+}
+
 .retro-button__arrow,
 .icon-button {
   color: var(--sketch-ink);
@@ -407,6 +421,21 @@ body {
 .taste-analysis-error {
   max-height: min(76vh, 48rem);
   padding: clamp(0.9rem, 2vw, 1.35rem) 0.25rem 0.9rem;
+}
+
+.playlist-input-panel {
+  background: var(--sketch-paper-bright);
+  border: var(--control-stroke) solid var(--sketch-ink);
+  border-radius: 10px 7px 12px 8px / 8px 12px 7px 11px;
+  box-shadow: 3px 4px 0 rgba(35, 34, 31, 0.08);
+}
+
+.playlist-extraction-review,
+.playlist-extraction-status,
+.playlist-extraction-error,
+.taste-analysis-status,
+.taste-analysis-error {
+  background: var(--sketch-paper-bright);
 }
 
 .playlist-input-panel__topline,

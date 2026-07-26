@@ -92,13 +92,19 @@ describe('music sketchbook work note theme', () => {
     }
   })
 
-  it('keeps decoration on the room and gives only dialogue an opaque paper surface', () => {
+  it('keeps decoration behind opaque dialogue, choices, and input surfaces', () => {
     expect(ruleFor('.room-stage::after')).toContain('opacity: 0.48')
     expect(ruleFor('.dialogue-box')).toContain(
       'background: var(--sketch-paper-bright)',
     )
     expect(ruleFor('.dialogue-box')).toContain(
       'border: var(--control-stroke) solid var(--sketch-ink)',
+    )
+    expect(ruleFor('.choice-menu .retro-button')).toContain(
+      'background: var(--sketch-paper-bright)',
+    )
+    expect(ruleFor('.playlist-input-panel')).toContain(
+      'background: var(--sketch-paper-bright)',
     )
     expect(themeCss).not.toContain('.room-interface')
   })
