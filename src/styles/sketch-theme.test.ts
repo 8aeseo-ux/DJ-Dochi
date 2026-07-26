@@ -140,4 +140,20 @@ describe('music sketchbook work note theme', () => {
     expect(themeCss).toContain('.platform-listen__track-link')
     expect(themeCss).not.toContain('box-shadow: 8px 10px')
   })
+
+  it('uses the Gothic UI role for late-flow controls and result content', () => {
+    for (const selector of [
+      '.room-vinyl-status',
+      '.camera-capture__panel',
+      '.photo-review__panel',
+      '.mixtape-overlay__card',
+      '.final-mixtape__card',
+      '.platform-listen__button',
+    ]) {
+      expect(ruleFor(selector)).toContain('font-family: var(--font-ui)')
+    }
+
+    expect(ruleFor('.camera-capture__panel')).toContain('background: var(--sketch-paper-bright)')
+    expect(ruleFor('.final-mixtape__card')).toContain('background: var(--sketch-paper-bright)')
+  })
 })

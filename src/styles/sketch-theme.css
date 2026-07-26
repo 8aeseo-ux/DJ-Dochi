@@ -694,16 +694,29 @@ body {
 .polaroid-composer__loading,
 .polaroid-composer__error {
   color: var(--sketch-ink);
-  background: var(--sketch-paper);
+  background: var(--sketch-paper-bright);
   border: var(--control-stroke) solid var(--sketch-ink);
   border-radius: 12px 7px 14px 8px / 8px 13px 7px 12px;
   box-shadow: none;
+  font-family: var(--font-ui);
+}
+
+.camera-capture__panel {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-family: var(--font-ui);
+}
+
+.photo-review__panel {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-family: var(--font-ui);
 }
 
 .camera-capture__topline {
   color: var(--sketch-pencil);
   border-color: var(--sketch-faint);
-  font-family: var(--font-note);
+  font-family: var(--font-ui);
 }
 
 .camera-capture__intro h2,
@@ -792,13 +805,26 @@ body {
 .mixtape-card,
 .final-mixtape__card {
   color: var(--sketch-ink);
-  background: var(--sketch-paper);
+  background: var(--sketch-paper-bright);
   border: 0;
   border-width: 1.5px 0;
   border-style: solid;
   border-color: var(--sketch-ink);
   border-radius: 0;
   box-shadow: none;
+  font-family: var(--font-ui);
+}
+
+.mixtape-overlay__card {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-family: var(--font-ui);
+}
+
+.final-mixtape__card {
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-family: var(--font-ui);
 }
 
 .mixtape-overlay__topline,
@@ -906,6 +932,13 @@ body {
 
 .platform-listen__buttons {
   gap: 0.5rem;
+}
+
+.platform-listen__button {
+  min-height: 44px;
+  color: var(--sketch-ink);
+  background: var(--sketch-paper-bright);
+  font-family: var(--font-ui);
 }
 
 .platform-listen__mark {
@@ -1103,6 +1136,7 @@ select,
   background: var(--sketch-paper-bright);
   border: 1.5px solid var(--sketch-ink);
   border-radius: 8px 5px 9px 6px / 6px 9px 5px 8px;
+  font-family: var(--font-ui);
 }
 
 .room-vinyl-status strong {
