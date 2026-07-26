@@ -33,11 +33,25 @@ describe('music sketchbook work note theme', () => {
       .toBeGreaterThan(indexCss.indexOf("./styles/dj-dochi.css"))
   })
 
-  it('separates readable UI typography from decorative notes', () => {
+  it('uses Gothic for functional text and handwriting only for decoration', () => {
     expect(themeCss).toContain('--font-ui:')
     expect(themeCss).toContain('--font-note:')
-    expect(themeCss).toContain('font-family: var(--font-ui)')
-    expect(themeCss).toContain('.room-visual::before')
+    expect(ruleFor('body')).toContain('font-family: var(--font-ui)')
+
+    for (const selector of [
+      '.dialogue-box__line',
+      '.retro-button',
+      '.playlist-input-panel',
+      '.playlist-extraction-review',
+      '.camera-capture__panel',
+      '.final-mixtape__card',
+    ]) {
+      expect(themeCss).toContain(selector)
+    }
+
+    expect(themeCss).toContain('.room-stage::before')
+    expect(themeCss).toContain('.room-wall-mark')
+    expect(themeCss).toContain('.final-mixtape__signature')
     expect(themeCss).toContain('font-family: var(--font-note)')
   })
 
@@ -78,32 +92,38 @@ describe('music sketchbook work note theme', () => {
     }
   })
 
-  it('keeps scene decoration inside the visual layer and the UI on opaque paper', () => {
-    expect(ruleFor('.room-visual::after')).toContain('opacity: 0.14')
-    expect(ruleFor('.room-interface')).toContain('background: var(--sketch-paper-bright)')
-    expect(ruleFor('.room-interface--empty')).toContain('display: none')
+  it('keeps decoration on the room and gives only dialogue an opaque paper surface', () => {
+    expect(ruleFor('.room-stage::after')).toContain('opacity: 0.48')
+    expect(ruleFor('.dialogue-box')).toContain(
+      'background: var(--sketch-paper-bright)',
+    )
+    expect(ruleFor('.dialogue-box')).toContain(
+      'border: var(--control-stroke) solid var(--sketch-ink)',
+    )
+    expect(themeCss).not.toContain('.room-interface')
   })
 
-  it('keeps upload and action surfaces clean and readable', () => {
-    expect(ruleFor('.file-dropzone')).toContain('background: var(--sketch-paper-bright)')
-    expect(ruleFor('.file-dropzone')).not.toContain('gradient')
-    expect(ruleFor('.retro-button')).toContain('min-height: 44px')
+  it('keeps the original open upload and hand-drawn action treatment', () => {
+    expect(themeCss).toContain('.file-dropzone,')
+    expect(ruleFor('.file-dropzone')).toContain('border-style: dashed')
+    expect(themeCss).toContain('.retro-button,')
+    expect(themeCss).toContain('border: var(--control-stroke) solid var(--sketch-ink)')
   })
 
   it('includes interaction and accessibility safeguards', () => {
     expect(themeCss).toContain('pointer-events: none')
     expect(themeCss).toContain(':focus-visible')
-    expect(themeCss).toContain('@media (max-width: 900px)')
+    expect(themeCss).toContain('@media (max-width: 760px)')
     expect(themeCss).toContain('@media (prefers-reduced-motion: reduce)')
   })
 
-  it('defines desktop, tablet, and mobile readability breakpoints', () => {
-    expect(themeCss).toContain('@media (max-width: 1099px)')
-    expect(themeCss).toContain('grid-template-columns: minmax(0, 54fr) minmax(22rem, 46fr)')
-    expect(themeCss).toContain('@media (max-width: 900px)')
-    expect(themeCss).toContain('grid-template-columns: minmax(0, 1fr)')
-    expect(themeCss).toContain('@media (max-width: 520px)')
-    expect(themeCss).toContain('min-height: 44px')
+  it('keeps one responsive room composition without split-layout breakpoints', () => {
+    expect(ruleFor('.room-stage')).toContain('min-height: 39rem')
+    expect(ruleFor('.room-stage')).not.toContain('grid-template-columns')
+    expect(themeCss).toContain('@media (max-width: 760px)')
+    expect(themeCss).not.toContain('@media (max-width: 1099px)')
+    expect(themeCss).not.toContain('@media (max-width: 900px)')
+    expect(themeCss).not.toContain('.room-stage--with-interface')
   })
 
   it('uses one hand-drawn workshop SVG without interactive behavior', () => {
@@ -143,7 +163,7 @@ describe('music sketchbook work note theme', () => {
 
   it('uses the Gothic UI role for late-flow controls and result content', () => {
     for (const selector of [
-      '.room-vinyl-status',
+      '.vinyl-interaction__hint',
       '.camera-capture__panel',
       '.photo-review__panel',
       '.mixtape-overlay__card',
@@ -153,7 +173,7 @@ describe('music sketchbook work note theme', () => {
       expect(ruleFor(selector)).toContain('font-family: var(--font-ui)')
     }
 
-    expect(ruleFor('.camera-capture__panel')).toContain('background: var(--sketch-paper-bright)')
-    expect(ruleFor('.final-mixtape__card')).toContain('background: var(--sketch-paper-bright)')
+    expect(ruleFor('.camera-capture__panel')).toContain('background: var(--sketch-paper)')
+    expect(ruleFor('.final-mixtape__card')).toContain('background: var(--sketch-paper)')
   })
 })
