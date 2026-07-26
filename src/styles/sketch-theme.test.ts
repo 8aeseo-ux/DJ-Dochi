@@ -14,13 +14,24 @@ const workshopDoodles = existsSync(workshopDoodlesUrl)
   : ''
 
 describe('music sketchbook work note theme', () => {
-  it('loads local handwriting fonts before the final theme layer', () => {
+  it('loads local Gothic UI text before decorative handwriting and theme overrides', () => {
+    expect(indexCss).toContain("@import 'pretendard/dist/web/static/pretendard.css'")
     expect(indexCss).toContain("@import '@fontsource/gaegu/400.css'")
     expect(indexCss).toContain("@import '@fontsource/gaegu/700.css'")
+    expect(indexCss.indexOf("pretendard/dist/web/static/pretendard.css"))
+      .toBeLessThan(indexCss.indexOf("@fontsource/gaegu/400.css"))
     expect(indexCss.indexOf("@fontsource/gaegu/700.css"))
       .toBeLessThan(indexCss.indexOf("./styles/dj-dochi.css"))
     expect(indexCss.indexOf("./styles/sketch-theme.css"))
       .toBeGreaterThan(indexCss.indexOf("./styles/dj-dochi.css"))
+  })
+
+  it('separates readable UI typography from decorative notes', () => {
+    expect(themeCss).toContain('--font-ui:')
+    expect(themeCss).toContain('--font-note:')
+    expect(themeCss).toContain('font-family: var(--font-ui)')
+    expect(themeCss).toContain('.room-visual::before')
+    expect(themeCss).toContain('font-family: var(--font-note)')
   })
 
   it('defines an unruled ink sketchbook palette', () => {

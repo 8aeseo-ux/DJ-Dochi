@@ -9,6 +9,8 @@
   --sketch-blue: #5574a6;
   --sketch-yellow: #d8b94f;
   --sketch-green: #4f7b67;
+  --font-ui: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Apple SD Gothic Neo", sans-serif;
   --font-note: "Gaegu", "Apple SD Gothic Neo", sans-serif;
   --control-stroke: 1.4px;
 
@@ -39,7 +41,7 @@ body,
 }
 
 body {
-  font-family: "Avenir Next", Avenir, "Apple SD Gothic Neo", sans-serif;
+  font-family: var(--font-ui);
 }
 
 ::selection {
@@ -133,7 +135,7 @@ body {
   box-shadow: none;
 }
 
-.room-stage::before {
+.room-visual::before {
   content: "today's mix notes  ♪";
   position: absolute;
   top: 4.4rem;
@@ -936,6 +938,70 @@ body {
 
 .platform-listen__note {
   color: var(--sketch-pencil);
+  font-family: var(--font-ui);
+}
+
+button,
+input,
+textarea,
+select,
+.brand-lockup__name,
+.brand-lockup__tag,
+.topbar__status,
+.screen-eyebrow,
+.dialogue-box,
+.dialogue-box__eyebrow,
+.dialogue-box__line,
+.dialogue-box__next,
+.choice-menu,
+.retro-button,
+.retro-button__arrow,
+.icon-button,
+.panel-heading,
+.panel-intro__number,
+.file-dropzone__icon,
+.extraction-track-row__index,
+.playlist-input-panel,
+.playlist-extraction-review,
+.playlist-extraction-status,
+.playlist-extraction-error,
+.taste-analysis-status,
+.taste-analysis-error,
+.workshop-effects__message,
+.room-vinyl-status,
+.vinyl-interaction__hint,
+.vinyl-interaction__recording-label,
+.vinyl-energy,
+.camera-capture__panel,
+.photo-review__panel,
+.camera-capture__topline,
+.camera-capture__intro h2,
+.camera-capture__fallback h2,
+.photo-review__caption,
+.polaroid-composer__loading,
+.polaroid-composer__error,
+.tape-trigger,
+.tape-trigger__label,
+.tape-trigger__hint,
+.mixtape-overlay__card,
+.mixtape-card,
+.mixtape-card__title h2,
+.mixtape-card__title p,
+.mixtape-card__atmosphere,
+.final-mixtape__card,
+.track-row__index,
+.platform-listen__track-index,
+.platform-listen__button,
+.final-mixtape__platform-button,
+.platform-listen__track-link {
+  font-family: var(--font-ui);
+}
+
+.room-visual::before,
+.room-wall-mark,
+.vinyl-interaction__label,
+.mixtape-card__sticker,
+.final-mixtape__signature {
   font-family: var(--font-note);
 }
 
