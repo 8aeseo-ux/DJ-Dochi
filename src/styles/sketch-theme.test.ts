@@ -20,6 +20,13 @@ function ruleFor(selector: string) {
   return themeCss.slice(start, end + 1)
 }
 
+function groupedRuleFor(firstSelector: string) {
+  const start = themeCss.indexOf(`${firstSelector},`)
+  if (start < 0) return ''
+  const end = themeCss.indexOf('}', start)
+  return themeCss.slice(start, end + 1)
+}
+
 describe('music sketchbook work note theme', () => {
   it('loads local Gothic UI text before decorative handwriting and theme overrides', () => {
     expect(indexCss).toContain("@import 'pretendard/dist/web/static/pretendard.css'")
@@ -109,13 +116,22 @@ describe('music sketchbook work note theme', () => {
     expect(themeCss).not.toContain('.room-interface')
   })
 
-  it('uses lighter, smaller typography for dialogue and choice labels', () => {
+  it('uses lighter, smaller typography for dialogue and shared action buttons', () => {
     expect(ruleFor('.dialogue-box__line')).toContain(
       'font-size: clamp(1.05rem, 1.85vw, 1.5rem)',
     )
     expect(ruleFor('.dialogue-box__line')).toContain('font-weight: 500')
-    expect(ruleFor('.choice-menu .retro-button')).toContain('font-size: 0.9rem')
-    expect(ruleFor('.choice-menu .retro-button')).toContain('font-weight: 500')
+
+    const actionButtons = groupedRuleFor('.retro-button')
+    expect(actionButtons).toContain('.platform-listen__button')
+    expect(actionButtons).toContain('.final-mixtape__platform-button')
+    expect(actionButtons).toContain('font-size: 0.9rem')
+    expect(actionButtons).toContain('font-weight: 500')
+
+    expect(ruleFor('.choice-menu .retro-button')).not.toContain('font-size:')
+    expect(ruleFor('.choice-menu .retro-button')).not.toContain('font-weight:')
+    expect(ruleFor('.file-dropzone')).not.toContain('font-size: 0.9rem')
+    expect(ruleFor('.icon-button')).not.toContain('font-size: 0.9rem')
   })
 
   it('keeps the original open upload and hand-drawn action treatment', () => {

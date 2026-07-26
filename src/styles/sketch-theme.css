@@ -326,8 +326,8 @@ body {
   border-radius: 999px 940px 980px 920px / 820px 980px 860px 940px;
   box-shadow: none;
   font-family: var(--font-ui);
-  font-size: 1.05em;
-  font-weight: 700;
+  font-size: 0.9rem;
+  font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   transform: rotate(-0.16deg);
@@ -389,8 +389,6 @@ body {
 
 .choice-menu .retro-button {
   background: var(--sketch-paper-bright);
-  font-size: 0.9rem;
-  font-weight: 500;
 }
 
 .choice-menu .retro-button:hover:not(:disabled) {
