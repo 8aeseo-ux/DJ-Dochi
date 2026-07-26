@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -139,29 +139,24 @@ describe('DJ DOCHI fixed-room flow', () => {
     expect(controller.querySelector('img')).toHaveAttribute('src', expect.stringContaining('dj-controller.webp'))
   })
 
-  it('keeps scene objects and readable UI in separate room layers', async () => {
+  it('keeps scene objects and dialogue in one persistent room stage', async () => {
     const user = userEvent.setup()
     const { container } = render(<App />)
 
-    const visual = container.querySelector('.room-visual')
-    const roomInterface = container.querySelector('.room-interface')
     const stage = container.querySelector('.room-stage')
 
-    expect(visual).toBeInTheDocument()
-    expect(roomInterface).toBeInTheDocument()
-    expect(roomInterface).toHaveClass('room-interface--empty')
+    expect(stage).toBeInTheDocument()
+    expect(container.querySelector('.room-visual')).not.toBeInTheDocument()
+    expect(container.querySelector('.room-interface')).not.toBeInTheDocument()
     expect(stage).not.toHaveClass('room-stage--with-interface')
-    expect(visual?.querySelector('.room-character')).toBeInTheDocument()
-    expect(visual?.querySelector('.room-controller-layer')).toBeInTheDocument()
-    expect(roomInterface?.querySelector('.room-character')).not.toBeInTheDocument()
+    expect(stage?.querySelector('.room-character')).toBeInTheDocument()
+    expect(stage?.querySelector('.room-controller-layer')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'DJ 도치 idle' }))
 
-    expect(roomInterface).not.toHaveClass('room-interface--empty')
-    expect(stage).toHaveClass('room-stage--with-interface')
-    expect(
-      within(roomInterface as HTMLElement).getByRole('button', { name: '도치의 대화' }),
-    ).toBeInTheDocument()
+    expect(stage).toContainElement(
+      screen.getByRole('button', { name: '도치의 대화' }),
+    )
   })
 
   it('opens the input panel over the unchanged room after the dialogue', async () => {
@@ -210,13 +205,11 @@ describe('DJ DOCHI fixed-room flow', () => {
     expect(screen.getByText('DJ DOCHI')).toBeInTheDocument()
 
     const vinyl = screen.getByRole('slider', { name: 'LP를 돌려 믹스를 시작하세요' })
-    const visual = document.querySelector('.room-visual')
-    const roomInterface = document.querySelector('.room-interface')
+    const stage = document.querySelector('.room-stage')
     const vinylStatus = document.querySelector('.room-vinyl-status')
 
-    expect(visual).toContainElement(vinyl)
-    expect(roomInterface).toContainElement(vinylStatus as HTMLElement)
-    expect(visual).not.toContainElement(vinylStatus as HTMLElement)
+    expect(stage).toContainElement(vinyl)
+    expect(vinylStatus).not.toBeInTheDocument()
 
     prepareVinyl(vinyl)
     dispatchVinylPointer(vinyl, 'pointerdown', 200, 100, 100)
