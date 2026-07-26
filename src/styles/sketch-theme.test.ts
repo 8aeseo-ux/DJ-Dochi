@@ -93,8 +93,17 @@ describe('music sketchbook work note theme', () => {
   it('includes interaction and accessibility safeguards', () => {
     expect(themeCss).toContain('pointer-events: none')
     expect(themeCss).toContain(':focus-visible')
-    expect(themeCss).toContain('@media (max-width: 760px)')
+    expect(themeCss).toContain('@media (max-width: 900px)')
     expect(themeCss).toContain('@media (prefers-reduced-motion: reduce)')
+  })
+
+  it('defines desktop, tablet, and mobile readability breakpoints', () => {
+    expect(themeCss).toContain('@media (max-width: 1099px)')
+    expect(themeCss).toContain('grid-template-columns: minmax(0, 54fr) minmax(22rem, 46fr)')
+    expect(themeCss).toContain('@media (max-width: 900px)')
+    expect(themeCss).toContain('grid-template-columns: minmax(0, 1fr)')
+    expect(themeCss).toContain('@media (max-width: 520px)')
+    expect(themeCss).toContain('min-height: 44px')
   })
 
   it('uses one hand-drawn workshop SVG without interactive behavior', () => {
