@@ -1,5 +1,7 @@
 import type { MusicPlatform, Track } from '../types'
 
+export type PlatformListenableTrack = Pick<Track, 'artist' | 'title' | 'platforms'>
+
 export type MusicPlatformDefinition = {
   id: MusicPlatform
   label: string
@@ -72,7 +74,7 @@ export function buildPlatformTrackUrl(platform: MusicPlatform, trackId: string |
 
 export function buildPlatformSearchUrl(
   platform: MusicPlatform,
-  track: Pick<Track, 'artist' | 'title'>,
+  track: Pick<PlatformListenableTrack, 'artist' | 'title'>,
 ): string {
   const definition = MUSIC_PLATFORM_DEFINITIONS.find((item) => item.id === platform)
   const query = `${track.artist} ${track.title}`
@@ -82,7 +84,7 @@ export function buildPlatformSearchUrl(
 
 export function resolvePlatformTrackLink(
   platform: MusicPlatform,
-  track: Track,
+  track: PlatformListenableTrack,
 ): { href: string; isDirect: boolean } {
   const reference = track.platforms[platform]
   const storedUrl = getTrimmedValue(reference.url)

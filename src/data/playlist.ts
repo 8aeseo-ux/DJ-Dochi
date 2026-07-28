@@ -1,4 +1,5 @@
 import type { Track } from '../types'
+import type { MixtapeResult } from '../types/mixtape'
 
 export const DUMMY_TRACKS: Track[] = [
   {
@@ -67,4 +68,33 @@ export const DUMMY_MIX = {
   title: "DOCHI'S NIGHT DRIVE",
   subtitle: 'a little neon, a little nostalgia',
   score: 'A+ / 94%',
+}
+
+export const DUMMY_MIXTAPE_RESULT: MixtapeResult = {
+  tasteProfile: {
+    summary: '네온빛과 밤공기처럼 부드러운 그루브를 좋아해요.',
+    genres: ['city pop', 'dream pop'],
+    moods: ['late night', 'warm drive'],
+    traits: ['soft synths', 'nostalgic groove'],
+  },
+  mixtape: {
+    title: DUMMY_MIX.title,
+    subtitle: DUMMY_MIX.subtitle,
+    dochiComment: '이 밤의 흐름, 꽤 좋네.',
+    design: {
+      atmosphere: '작은 네온사인이 켜진 밤의 드라이브',
+      palette: ['midnight blue', 'coral', 'amber'],
+      texture: 'matte cassette plastic',
+      motifs: ['city lights', 'tiny stars'],
+    },
+    tracks: DUMMY_TRACKS.map((track, index) => ({
+      id: `recommendation-${String(index + 1).padStart(3, '0')}`,
+      title: track.title,
+      artist: track.artist,
+      album: '',
+      reason: '도치가 준비한 개발용 추천곡이에요.',
+      catalogStatus: 'verified' as const,
+      platforms: track.platforms,
+    })),
+  },
 }

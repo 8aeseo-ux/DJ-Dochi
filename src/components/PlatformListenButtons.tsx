@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import type { MusicPlatform, Track } from '../types'
-import { MUSIC_PLATFORM_DEFINITIONS, resolvePlatformTrackLink } from '../lib/musicPlatforms'
+import type { MusicPlatform } from '../types'
+import { MUSIC_PLATFORM_DEFINITIONS, resolvePlatformTrackLink, type PlatformListenableTrack } from '../lib/musicPlatforms'
 
 type PlatformListenButtonsProps = {
-  tracks: readonly Track[]
+  tracks: readonly PlatformListenableTrack[]
 }
 
 export default function PlatformListenButtons({ tracks }: PlatformListenButtonsProps) {

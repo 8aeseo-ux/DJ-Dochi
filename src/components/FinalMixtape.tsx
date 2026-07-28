@@ -1,15 +1,18 @@
-import { DUMMY_MIX, DUMMY_TRACKS } from '../data/playlist'
 import { getDochiAsset } from '../lib/dochiAssets'
+import type { MixtapeResult } from '../types/mixtape'
 import Panel from './Panel'
 import PlatformListenButtons from './PlatformListenButtons'
 import RetroButton from './RetroButton'
 
 type FinalMixtapeProps = {
+  result: MixtapeResult
   open: boolean
   polaroidUrl?: string | null
   onOpen: () => void
   onClose: () => void
 }
+
+const TRACK_COLORS = ['coral', 'amber', 'violet', 'mint'] as const
 
 function MemoryLabel({ polaroidUrl }: { polaroidUrl?: string | null }) {
   const stickerUrl = getDochiAsset('result')
@@ -29,7 +32,7 @@ function MemoryLabel({ polaroidUrl }: { polaroidUrl?: string | null }) {
   )
 }
 
-export default function FinalMixtape({ open, polaroidUrl = null, onOpen, onClose }: FinalMixtapeProps) {
+export default function FinalMixtape({ result, open, polaroidUrl = null, onOpen, onClose }: FinalMixtapeProps) {
   if (!open) {
     return (
       <button className="tape-trigger final-mixtape__trigger" type="button" aria-label="믹스테이프 보기" onClick={onOpen}>
@@ -53,19 +56,28 @@ export default function FinalMixtape({ open, polaroidUrl = null, onOpen, onClose
         <MemoryLabel polaroidUrl={polaroidUrl} />
         <div className="mixtape-card__title">
           <span className="mixtape-card__sticker">FOR<br />YOU</span>
-          <div><span className="screen-eyebrow">YOUR PERSONAL RECEIPT</span><h2>{DUMMY_MIX.title}</h2><p>{DUMMY_MIX.subtitle}</p></div>
+          <div>
+            <span className="screen-eyebrow">YOUR PERSONAL RECEIPT</span>
+            <h2>{result.mixtape.title}</h2>
+            <p>{result.mixtape.subtitle}</p>
+          </div>
+        </div>
+        <div className="mixtape-card__taste">
+          <span className="screen-eyebrow">DOCHI READS YOUR TASTE</span>
+          <p>{result.tasteProfile.summary}</p>
+          <span className="mixtape-card__atmosphere">{result.mixtape.design.atmosphere}</span>
         </div>
         <div className="track-list">
-          {DUMMY_TRACKS.map((track, index) => (
+          {result.mixtape.tracks.map((track, index) => (
             <div className="track-row" key={`${track.artist}-${track.title}`}>
-              <span className={`track-row__index track-row__index--${track.color}`}>{String(index + 1).padStart(2, '0')}</span>
-              <div className="track-row__name"><strong>{track.title}</strong><span>{track.artist}</span></div>
-              <span className="track-row__mood">{track.mood}</span>
-              <span className="track-row__stat">{track.stat}</span>
+              <span className={`track-row__index track-row__index--${TRACK_COLORS[index % TRACK_COLORS.length]}`}>{String(index + 1).padStart(2, '0')}</span>
+              <div className="track-row__name"><strong>{track.title}</strong><span>{track.artist}</span><small>{track.reason}</small></div>
+              <span className="track-row__mood">{result.tasteProfile.moods[index % result.tasteProfile.moods.length]}</span>
+              <span className="track-row__stat">{track.catalogStatus.toUpperCase()}</span>
             </div>
           ))}
         </div>
-        <PlatformListenButtons tracks={DUMMY_TRACKS} />
+        <PlatformListenButtons tracks={result.mixtape.tracks} />
         <div className="mixtape-overlay__footer">
           <span>MADE WITH A LITTLE TASTE</span>
           <RetroButton variant="ghost" onClick={onClose}>닫기</RetroButton>

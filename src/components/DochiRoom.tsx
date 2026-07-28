@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { DUMMY_MIXTAPE_RESULT } from '../data/playlist'
 import type { DochiPose } from '../types'
 import type { DjDochiFlow } from '../hooks/useDjDochiFlow'
 import ChoiceMenu from './ChoiceMenu'
@@ -8,11 +9,15 @@ import DochiCharacter from './DochiCharacter'
 import DjController from './DjController'
 import Equalizer from './Equalizer'
 import FinalMixtape from './FinalMixtape'
+import Panel from './Panel'
 import PlaylistInputPanel from './PlaylistInputPanel'
+import PlaylistExtractionReview from './PlaylistExtractionReview'
 import PhotoReview from './PhotoReview'
 import PolaroidComposer from './PolaroidComposer'
+import TasteAnalysisErrorPanel from './TasteAnalysisErrorPanel'
 import VinylInteraction from './VinylInteraction'
 import WorkshopEffects from './WorkshopEffects'
+import RetroButton from './RetroButton'
 
 type DochiRoomProps = {
   flow: DjDochiFlow
@@ -42,6 +47,15 @@ function getMotion(state: DjDochiFlow['state']): 'groove' | 'still' | 'walk-out'
   return 'still'
 }
 
+function getExtractionStatus(
+  progress: DjDochiFlow['extractionProgress'],
+): string {
+  if (progress?.phase === 'loading-engine') return '글자를 읽을 준비 중...'
+  if (progress?.phase === 'recognizing') return '곡 이름을 읽는 중...'
+  if (progress?.phase === 'parsing') return '곡명과 아티스트를 정리하는 중...'
+  return '곡 이름부터 읽어보는 중...'
+}
+
 export default function DochiRoom({ flow }: DochiRoomProps) {
   const {
     state,
@@ -50,6 +64,13 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     inputMode,
     input,
     hasInput,
+    inputError,
+    extractionResult,
+    extractionError,
+    activeExtractorId,
+    extractionProgress,
+    tasteAnalysisError,
+    mixtapeResult,
     workMessage,
     spinEnergy,
     spinIntensity,
@@ -63,9 +84,12 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     || state === 'recordingIntro'
     || state === 'needleDropping'
     || state === 'recording'
+  const isExtracting = state === 'extracting'
+  const isAnalyzingTaste = state === 'analyzingTaste'
   const isRecording = state === 'recording'
   const vinylPhase = state === 'needleDropping' ? 'needle' : isRecording ? 'recording' : 'spin'
   const isTapeAvailable = state === 'finalTape' || state === 'givingTape' || state === 'viewingTape'
+  const renderedMixtape = mixtapeResult ?? (import.meta.env.DEV ? DUMMY_MIXTAPE_RESULT : null)
   const isLastDialogueLine = dialogue !== null && dialogue.index === dialogue.total - 1
   const isPhotoPromptChoice = state === 'photoPrompt' && isLastDialogueLine
   const isFinalTapeChoice = state === 'finalTape' && isLastDialogueLine
@@ -89,7 +113,10 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
           <div className="topbar__status"><span className="status-dot" aria-hidden="true" /> ROOM 01 / ON AIR</div>
         </header>
 
-        <main className={`room-stage room-stage--${state} ${isOverdrive ? 'room-stage--overdrive' : ''}`.trim()} style={roomStyle}>
+        <main
+          className={`room-stage room-stage--${state} ${isOverdrive ? 'room-stage--overdrive' : ''}`.trim()}
+          style={roomStyle}
+        >
           <div className="room-wall-mark" aria-hidden="true"><span>DOCHI</span><span>FM</span></div>
           <div className="room-grid-glow" aria-hidden="true" />
 
@@ -101,7 +128,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
           </section>
 
           <WorkshopEffects
-            active={isMixing}
+            active={isMixing || isExtracting}
             message={workMessage}
             energy={spinEnergy}
             intensity={spinIntensity}
@@ -159,6 +186,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
               mode={inputMode}
               input={input}
               hasInput={hasInput}
+              inputError={inputError?.message}
               onImageSelect={actions.selectImage}
               onTextChange={actions.updateText}
               onHandoff={actions.handoff}
@@ -167,11 +195,112 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             />
           )}
 
+          {state === 'extracting' && (
+            <Panel className="playlist-extraction-status" role="status" aria-label="플레이리스트 이미지 분석 중">
+              <span className="screen-eyebrow">
+                {activeExtractorId === 'openai-vision' ? 'DOCHI VISION / READING' : 'DOCHI OCR / READING'}
+              </span>
+              <div className="playlist-extraction-status__scan" aria-hidden="true"><i /><i /><i /></div>
+              <strong>{getExtractionStatus(extractionProgress)}</strong>
+              <p>
+                {activeExtractorId === 'openai-vision'
+                  ? '이미지를 AI Vision으로 보내 곡 목록을 읽고 있어요.'
+                  : '이미지는 이 기기 안에서만 읽고 있어요.'}
+              </p>
+            </Panel>
+          )}
+
+          {isAnalyzingTaste && (
+            <Panel className="taste-analysis-status" role="status" aria-label="취향 분석 중">
+              <span className="screen-eyebrow">DOCHI TASTE / ANALYZING</span>
+              <div className="playlist-extraction-status__scan" aria-hidden="true"><i /><i /><i /></div>
+              <strong>확인한 곡들로 네 취향을 살펴보는 중...</strong>
+              <p>검수한 곡 목록만 분석에 사용하고 있어요.</p>
+            </Panel>
+          )}
+
+          {state === 'extractionReview' && extractionResult && (
+            <PlaylistExtractionReview
+              result={extractionResult}
+              extractorId={activeExtractorId}
+              onTrackChange={actions.updateExtractedTrack}
+              onDeleteTrack={actions.deleteExtractedTrack}
+              onAddTrack={actions.addExtractedTrack}
+              onRetry={() => actions.retryExtraction()}
+              onRetryWithVision={() => actions.retryExtraction('openai-vision')}
+              onRetryWithOcr={() => actions.retryExtraction('browser-ocr')}
+              onConfirm={actions.confirmExtraction}
+              onChooseImage={actions.chooseAnotherImage}
+              onChooseText={actions.chooseTextAfterExtraction}
+            />
+          )}
+
+          {state === 'extractionError' && extractionError && (
+            <Panel className="playlist-extraction-error" role="alert" aria-label="플레이리스트 분석 오류">
+              <span className="screen-eyebrow">
+                {activeExtractorId === 'openai-vision' ? 'DOCHI VISION / ERROR' : 'DOCHI OCR / ERROR'}
+              </span>
+              <h2>이미지를 읽지 못했어.</h2>
+              <p>{extractionError.message}</p>
+              <div className="playlist-extraction-error__actions">
+                {extractionError.retryable && (
+                  <RetroButton onClick={() => actions.retryExtraction()}>다시 분석하기</RetroButton>
+                )}
+                {activeExtractorId === 'browser-ocr' && (
+                  <RetroButton
+                    variant="secondary"
+                    onClick={() => actions.retryExtraction('openai-vision')}
+                  >
+                    AI Vision으로 다시 읽기
+                  </RetroButton>
+                )}
+                {activeExtractorId === 'openai-vision' && (
+                  <RetroButton
+                    variant="secondary"
+                    onClick={() => actions.retryExtraction('browser-ocr')}
+                  >
+                    기기 OCR로 다시 읽기
+                  </RetroButton>
+                )}
+                <RetroButton variant="ghost" onClick={actions.chooseAnotherImage}>다른 이미지 선택</RetroButton>
+                <RetroButton variant="ghost" onClick={actions.chooseTextAfterExtraction}>음악 목록 붙여넣기</RetroButton>
+              </div>
+              {activeExtractorId === 'browser-ocr' && (
+                <p className="playlist-extraction-error__vision-note">
+                  AI Vision을 선택하면 이미지가 서버 분석을 위해 전송돼요.
+                </p>
+              )}
+              {activeExtractorId === 'openai-vision' && (
+                <p className="playlist-extraction-error__vision-note">
+                  기기 OCR은 서버로 이미지를 보내지 않고 브라우저에서 다시 읽어요.
+                </p>
+              )}
+            </Panel>
+          )}
+
+          {state === 'tasteAnalysisError' && tasteAnalysisError && (
+            <TasteAnalysisErrorPanel
+              issue={tasteAnalysisError}
+              onRetry={actions.retryTasteAnalysis}
+              onChooseImage={actions.chooseAnotherImage}
+              onChooseText={actions.chooseTextAfterExtraction}
+            />
+          )}
+
           {isPhotoPromptChoice && (
             <ChoiceMenu
               items={[
                 { label: '기념사진 찍기', onSelect: actions.acceptPhoto },
                 { label: '그냥 받을게', onSelect: actions.skipPhoto, variant: 'secondary' },
+              ]}
+            />
+          )}
+
+          {isFinalTapeChoice && (
+            <ChoiceMenu
+              items={[
+                { label: '믹스테이프 열기', onSelect: actions.openTape },
+                { label: '다시 부탁하기', onSelect: actions.restart, variant: 'secondary' },
               ]}
             />
           )}
@@ -196,17 +325,9 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             <PolaroidComposer userPhotoUrl={capturedPhotoUrl} onComplete={actions.completePolaroid} />
           )}
 
-          {isFinalTapeChoice && (
-            <ChoiceMenu
-              items={[
-                { label: '믹스테이프 열기', onSelect: actions.openTape },
-                { label: '다시 부탁하기', onSelect: actions.restart, variant: 'secondary' },
-              ]}
-            />
-          )}
-
-          {isTapeAvailable && (
+          {isTapeAvailable && renderedMixtape && (
             <FinalMixtape
+              result={renderedMixtape}
               open={state === 'viewingTape'}
               polaroidUrl={polaroidUrl}
               onOpen={actions.openTape}
@@ -214,7 +335,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             />
           )}
 
-          <div className="room-footer" aria-hidden="true"><span>PLAYLIST TASTE LAB</span><span>NO API / NO OCR / LOCAL PROTOTYPE</span></div>
+          <div className="room-footer" aria-hidden="true"><span>PLAYLIST TASTE LAB</span><span>VISION BETA / PRIVATE SESSION</span></div>
         </main>
       </div>
     </div>

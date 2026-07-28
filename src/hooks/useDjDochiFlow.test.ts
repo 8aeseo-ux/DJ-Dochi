@@ -1,6 +1,63 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { PlaylistAnalysisError } from '../types/playlistAnalysis'
+import { MixtapeAnalysisError } from '../types/mixtapeAnalysis'
+import { extractPlaylistFromImage } from '../services/playlistAnalysis'
+import { generateMixtapeFromTracks } from '../services/mixtapeAnalysis'
 import { useDjDochiFlow } from './useDjDochiFlow'
+
+vi.mock('../services/playlistAnalysis', () => ({
+  extractPlaylistFromImage: vi.fn(),
+}))
+
+vi.mock('../services/mixtapeAnalysis', () => ({
+  generateMixtapeFromTracks: vi.fn(),
+}))
+
+const extractPlaylistMock = vi.mocked(extractPlaylistFromImage)
+const generateMixtapeMock = vi.mocked(generateMixtapeFromTracks)
+
+const EXTRACTION_RESULT = {
+  sourceApp: 'Apple Music',
+  tracks: [
+    { id: 'track-001', title: 'Ditto', artist: 'NewJeans', album: '', confidence: 0.96 },
+    { id: 'track-002', title: 'Super Shy', artist: 'NewJeans', album: '', confidence: 0.91 },
+  ],
+  warnings: [],
+}
+
+const MIXTAPE_RESULT = {
+  tasteProfile: {
+    summary: '몽환적인 밤의 질감을 좋아해요.',
+    genres: ['dream pop'],
+    moods: ['late night'],
+    traits: ['soft vocals'],
+  },
+  mixtape: {
+    title: '새벽 두 시의 창문',
+    subtitle: 'soft lights, slow streets',
+    dochiComment: '밤에 음악 많이 듣지?',
+    design: {
+      atmosphere: '조용한 네온빛',
+      palette: ['midnight blue'],
+      texture: 'matte plastic',
+      motifs: ['window light'],
+    },
+    tracks: [{
+      id: 'recommendation-001',
+      title: 'Space Song',
+      artist: 'Beach House',
+      album: '',
+      reason: '입력곡의 몽환적인 결을 자연스럽게 이어가요.',
+      catalogStatus: 'verified' as const,
+      platforms: {
+        spotify: { id: null, url: null },
+        appleMusic: { id: null, url: null },
+        youtubeMusic: { id: null, url: null },
+      },
+    }],
+  },
+}
 
 function advanceToInputChoices(result: { current: ReturnType<typeof useDjDochiFlow> }) {
   act(() => result.current.actions.notice())
@@ -9,7 +66,7 @@ function advanceToInputChoices(result: { current: ReturnType<typeof useDjDochiFl
   }
 }
 
-function advanceToPhotoPrompt(result: { current: ReturnType<typeof useDjDochiFlow> }) {
+async function advanceToPhotoPrompt(result: { current: ReturnType<typeof useDjDochiFlow> }) {
   advanceToInputChoices(result)
 
   act(() => {
@@ -17,6 +74,8 @@ function advanceToPhotoPrompt(result: { current: ReturnType<typeof useDjDochiFlo
     result.current.actions.updateText('Beach House - Space Song')
     result.current.actions.handoff()
   })
+  act(() => result.current.actions.confirmExtraction())
+  await act(async () => { await Promise.resolve() })
   act(() => result.current.actions.advanceDialogue())
   act(() => result.current.actions.advanceDialogue())
   act(() => result.current.actions.completeSpin())
@@ -28,6 +87,8 @@ function advanceToPhotoPrompt(result: { current: ReturnType<typeof useDjDochiFlo
 
 describe('useDjDochiFlow', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
+    generateMixtapeMock.mockResolvedValue(MIXTAPE_RESULT)
     const createObjectURL = vi.fn(() => 'blob:dochi-preview')
     vi.stubGlobal('URL', {
       createObjectURL,
@@ -79,7 +140,7 @@ describe('useDjDochiFlow', () => {
     expect(result.current.hasInput).toBe(true)
   })
 
-  it('reacts to spin strength and stages celebration, needle, and recording automatically', () => {
+  it('reacts to spin strength and stages celebration, needle, and recording automatically', async () => {
     vi.useFakeTimers()
     const { result } = renderHook(() => useDjDochiFlow())
 
@@ -90,6 +151,9 @@ describe('useDjDochiFlow', () => {
       result.current.actions.handoff()
     })
 
+    expect(result.current.state).toBe('extractionReview')
+    act(() => result.current.actions.confirmExtraction())
+    await act(async () => { await Promise.resolve() })
     expect(result.current.state).toBe('receivingInput')
     expect(result.current.dialogue?.text).toBe('좋아.')
 
@@ -145,11 +209,11 @@ describe('useDjDochiFlow', () => {
     expect(result.current.dialogue?.text).toBe('됐다.')
   })
 
-  it('opens the tape overlay after the return dialogue and restarts cleanly', () => {
+  it('opens the tape overlay after the return dialogue and restarts cleanly', async () => {
     vi.useFakeTimers()
     const { result } = renderHook(() => useDjDochiFlow())
 
-    advanceToPhotoPrompt(result)
+    await advanceToPhotoPrompt(result)
     expect(result.current.state).toBe('photoPrompt')
 
     act(() => result.current.actions.advanceDialogue())
@@ -170,11 +234,11 @@ describe('useDjDochiFlow', () => {
     expect(result.current.dialogue).toBe(null)
   })
 
-  it('offers a memory photo after recording and builds the final tape path', () => {
+  it('offers a memory photo after recording and builds the final tape path', async () => {
     vi.useFakeTimers()
     const { result } = renderHook(() => useDjDochiFlow())
 
-    advanceToPhotoPrompt(result)
+    await advanceToPhotoPrompt(result)
 
     expect(result.current.state).toBe('photoPrompt')
     expect(result.current.dialogue?.text).toBe('됐다.')
@@ -200,11 +264,11 @@ describe('useDjDochiFlow', () => {
     expect(result.current.dialogue?.text).toBe('좋아.')
   })
 
-  it('can skip the camera and create a default Dochi sticker tape', () => {
+  it('can skip the camera and create a default Dochi sticker tape', async () => {
     vi.useFakeTimers()
     const { result } = renderHook(() => useDjDochiFlow())
 
-    advanceToPhotoPrompt(result)
+    await advanceToPhotoPrompt(result)
     act(() => result.current.actions.skipPhoto())
 
     expect(result.current.state).toBe('finalTape')
@@ -225,5 +289,161 @@ describe('useDjDochiFlow', () => {
 
     expect(result.current.input.imageUrl).toBe(null)
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dochi-preview')
+  })
+
+  it('extracts an image before entering the existing handoff flow', async () => {
+    extractPlaylistMock.mockImplementation(async (_file, options) => {
+      options?.onProgress?.({ phase: 'recognizing', value: 0.4 })
+      return EXTRACTION_RESULT
+    })
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+
+    expect(result.current.state).toBe('extracting')
+    expect(result.current.dialogue?.text).toBe('어디 보자.')
+    expect(extractPlaylistMock).toHaveBeenCalledWith(file, expect.objectContaining({
+      extractorId: 'openai-vision',
+      signal: expect.any(AbortSignal),
+      onProgress: expect.any(Function),
+    }))
+    expect(result.current.activeExtractorId).toBe('openai-vision')
+    expect(result.current.extractionProgress).toEqual({
+      phase: 'recognizing',
+      value: 0.4,
+    })
+
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('extractionReview')
+    expect(result.current.extractionResult).toEqual(EXTRACTION_RESULT)
+    expect(result.current.input.imageUrl).toBe(null)
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:dochi-preview')
+
+    act(() => result.current.actions.confirmExtraction())
+    expect(result.current.state).toBe('analyzingTaste')
+    expect(result.current.dialogue?.text).toBe('좋아. 이제 네 취향을 좀 볼게.')
+
+    await act(async () => { await Promise.resolve() })
+    expect(result.current.state).toBe('receivingInput')
+    expect(result.current.dialogue?.text).toBe('좋아.')
+    expect(result.current.mixtapeResult).toEqual(MIXTAPE_RESULT)
+  })
+
+  it('moves to extractionError and can explicitly retry with Vision', async () => {
+    extractPlaylistMock
+      .mockRejectedValueOnce(new PlaylistAnalysisError({
+        code: 'ANALYSIS_FAILED',
+        message: '이미지를 읽지 못했어요.',
+        retryable: true,
+      }))
+      .mockResolvedValueOnce(EXTRACTION_RESULT)
+
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.webp', { type: 'image/webp' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('extractionError')
+    expect(result.current.extractionError).toMatchObject({ code: 'ANALYSIS_FAILED' })
+    expect(result.current.activeExtractorId).toBe('openai-vision')
+
+    act(() => result.current.actions.retryExtraction('openai-vision'))
+    expect(result.current.state).toBe('extracting')
+    await act(async () => { await Promise.resolve() })
+    expect(result.current.state).toBe('extractionReview')
+    expect(extractPlaylistMock).toHaveBeenCalledTimes(2)
+    expect(extractPlaylistMock).toHaveBeenLastCalledWith(file, expect.objectContaining({
+      extractorId: 'openai-vision',
+    }))
+    expect(result.current.activeExtractorId).toBe('openai-vision')
+  })
+
+  it('stops before LP analysis on LLM failure and retries with the confirmed edits', async () => {
+    extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
+    generateMixtapeMock
+      .mockRejectedValueOnce(new MixtapeAnalysisError({
+        code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+        stage: 'catalog',
+        message: '확인되는 추천곡 후보가 부족해요.',
+        retryable: true,
+      }))
+      .mockResolvedValueOnce(MIXTAPE_RESULT)
+
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+    await act(async () => { await Promise.resolve() })
+
+    act(() => result.current.actions.updateExtractedTrack('track-001', 'title', 'Ditto (edited)'))
+    act(() => result.current.actions.deleteExtractedTrack('track-002'))
+    act(() => result.current.actions.confirmExtraction())
+
+    expect(result.current.state).toBe('analyzingTaste')
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('tasteAnalysisError')
+    expect(result.current.tasteAnalysisError).toMatchObject({
+      code: 'CATALOG_CANDIDATES_INSUFFICIENT',
+      stage: 'catalog',
+    })
+    expect(result.current.mixtapeResult).toBe(null)
+
+    act(() => result.current.actions.retryTasteAnalysis())
+    expect(result.current.state).toBe('analyzingTaste')
+    await act(async () => { await Promise.resolve() })
+
+    expect(result.current.state).toBe('receivingInput')
+    expect(generateMixtapeMock).toHaveBeenCalledTimes(2)
+    expect(generateMixtapeMock).toHaveBeenLastCalledWith([
+      { id: 'track-001', title: 'Ditto (edited)', artist: 'NewJeans', album: '' },
+    ], expect.objectContaining({ signal: expect.any(AbortSignal) }))
+  })
+
+  it('edits, deletes, and manually adds extracted tracks', async () => {
+    extractPlaylistMock.mockResolvedValue(EXTRACTION_RESULT)
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.jpg', { type: 'image/jpeg' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => result.current.actions.handoff())
+    await act(async () => { await Promise.resolve() })
+
+    act(() => result.current.actions.updateExtractedTrack('track-001', 'title', 'Ditto (edited)'))
+    expect(result.current.extractionResult?.tracks[0].title).toBe('Ditto (edited)')
+
+    act(() => result.current.actions.deleteExtractedTrack('track-002'))
+    expect(result.current.extractionResult?.tracks).toHaveLength(1)
+
+    act(() => result.current.actions.addExtractedTrack())
+    expect(result.current.extractionResult?.tracks).toHaveLength(2)
+    expect(result.current.extractionResult?.tracks[1]).toMatchObject({ title: '', artist: '' })
+  })
+
+  it('blocks unsupported image types before extraction', () => {
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.gif', { type: 'image/gif' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+
+    expect(result.current.input.imageFile).toBe(null)
+    expect(result.current.inputError).toMatchObject({ code: 'UNSUPPORTED_IMAGE_TYPE' })
+    expect(extractPlaylistMock).not.toHaveBeenCalled()
   })
 })

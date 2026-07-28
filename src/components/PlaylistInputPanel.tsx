@@ -8,6 +8,7 @@ type PlaylistInputPanelProps = {
   mode: Exclude<InputMode, null>
   input: PlaylistInput
   hasInput: boolean
+  inputError?: string | null
   onImageSelect: (file: File) => void
   onTextChange: (value: string) => void
   onHandoff: () => void
@@ -19,6 +20,7 @@ export default function PlaylistInputPanel({
   mode,
   input,
   hasInput,
+  inputError = null,
   onImageSelect,
   onTextChange,
   onHandoff,
@@ -66,6 +68,8 @@ export default function PlaylistInputPanel({
             {input.imageUrl && <RetroButton variant="ghost" onClick={onDelete}>삭제</RetroButton>}
             <RetroButton onClick={onHandoff} disabled={!hasInput}>도치에게 건네기</RetroButton>
           </div>
+          {inputError && <p className="playlist-input-panel__error" role="alert">{inputError}</p>}
+          <p className="playlist-input-panel__privacy">업로드한 이미지는 분석에만 사용되며 DJ DOCHI 서버에 저장되지 않습니다.</p>
         </div>
       ) : (
         <div className="playlist-input-panel__content">
@@ -95,7 +99,7 @@ export default function PlaylistInputPanel({
         id="playlist-file"
         className="visually-hidden"
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         aria-label="플레이리스트 캡처 파일"
         onChange={handleFileChange}
       />

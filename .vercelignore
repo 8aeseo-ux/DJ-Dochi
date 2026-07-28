@@ -1,0 +1,7 @@
+**/*.test.ts
+**/*.test.tsx
+docs/
+outputs/
+work/
+.superpowers/
+pnpm-workspace.yaml

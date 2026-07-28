@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { DUMMY_MIXTAPE_RESULT } from './data/playlist'
 import { VINYL_PHYSICS } from './lib/vinylPhysics'
 
 vi.mock('./components/PolaroidComposer', () => ({
@@ -138,6 +139,26 @@ describe('DJ DOCHI fixed-room flow', () => {
     expect(controller.querySelector('img')).toHaveAttribute('src', expect.stringContaining('dj-controller.webp'))
   })
 
+  it('keeps scene objects and dialogue in one persistent room stage', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<App />)
+
+    const stage = container.querySelector('.room-stage')
+
+    expect(stage).toBeInTheDocument()
+    expect(container.querySelector('.room-visual')).not.toBeInTheDocument()
+    expect(container.querySelector('.room-interface')).not.toBeInTheDocument()
+    expect(stage).not.toHaveClass('room-stage--with-interface')
+    expect(stage?.querySelector('.room-character')).toBeInTheDocument()
+    expect(stage?.querySelector('.room-controller-layer')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'DJ 도치 idle' }))
+
+    expect(stage).toContainElement(
+      screen.getByRole('button', { name: '도치의 대화' }),
+    )
+  })
+
   it('opens the input panel over the unchanged room after the dialogue', async () => {
     const user = userEvent.setup()
     render(<App />)
@@ -159,9 +180,18 @@ describe('DJ DOCHI fixed-room flow', () => {
     finishIntroWithEvents()
     fireEvent.click(screen.getByRole('button', { name: '음악 목록 적어주기' }))
     fireEvent.change(screen.getByLabelText('음악 목록'), { target: { value: 'Beach House - Space Song' } })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => DUMMY_MIXTAPE_RESULT,
+    }))
     fireEvent.click(screen.getByRole('button', { name: '도치에게 건네기' }))
 
     expect(screen.queryByRole('dialog', { name: '플레이리스트 입력' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: '추출한 음악 목록 확인' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이 목록이 맞아' }))
+    await act(async () => {
+      for (let tick = 0; tick < 10; tick += 1) await Promise.resolve()
+    })
 
     const handoffLines = ['좋아.', '이제 같이 믹스를 시작해보자.']
     for (const line of handoffLines) {
@@ -175,6 +205,12 @@ describe('DJ DOCHI fixed-room flow', () => {
     expect(screen.getByText('DJ DOCHI')).toBeInTheDocument()
 
     const vinyl = screen.getByRole('slider', { name: 'LP를 돌려 믹스를 시작하세요' })
+    const stage = document.querySelector('.room-stage')
+    const vinylStatus = document.querySelector('.room-vinyl-status')
+
+    expect(stage).toContainElement(vinyl)
+    expect(vinylStatus).not.toBeInTheDocument()
+
     prepareVinyl(vinyl)
     dispatchVinylPointer(vinyl, 'pointerdown', 200, 100, 100)
     dispatchVinylPointer(vinyl, 'pointermove', 100, 200, 140)
