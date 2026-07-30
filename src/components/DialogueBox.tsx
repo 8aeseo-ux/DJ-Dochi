@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getLastVoiceCharacterIndex } from '../audio/dochiVoiceCadence'
 
 const TYPEWRITER_DELAY_MS = 32
 
@@ -6,11 +7,26 @@ type DialogueBoxProps = {
   line: string
   dialogueKey: string
   onAdvance: () => void
+  onCharacterReveal?: (
+    character: string,
+    index: number,
+    metadata: { isTerminal: boolean },
+  ) => void
+  onTypingStop?: () => void
 }
 
-export default function DialogueBox({ line, dialogueKey, onAdvance }: DialogueBoxProps) {
+export default function DialogueBox({
+  line,
+  dialogueKey,
+  onAdvance,
+  onCharacterReveal,
+  onTypingStop,
+}: DialogueBoxProps) {
   const [visibleLength, setVisibleLength] = useState(0)
   const [revealed, setRevealed] = useState(false)
+  const activeDialogueKeyRef = useRef(dialogueKey)
+  const reportedLengthRef = useRef(0)
+  const lastVoiceCharacterIndex = getLastVoiceCharacterIndex(line)
 
   useEffect(() => {
     setVisibleLength(0)
@@ -23,16 +39,45 @@ export default function DialogueBox({ line, dialogueKey, onAdvance }: DialogueBo
     return () => window.clearInterval(timer)
   }, [dialogueKey, line])
 
+  useEffect(() => {
+    if (activeDialogueKeyRef.current !== dialogueKey) {
+      activeDialogueKeyRef.current = dialogueKey
+      reportedLengthRef.current = 0
+      return
+    }
+
+    if (revealed) {
+      reportedLengthRef.current = line.length
+      return
+    }
+
+    for (let index = reportedLengthRef.current; index < visibleLength; index += 1) {
+      onCharacterReveal?.(line[index], index, {
+        isTerminal: index === lastVoiceCharacterIndex,
+      })
+    }
+    reportedLengthRef.current = visibleLength
+  }, [
+    dialogueKey,
+    lastVoiceCharacterIndex,
+    line,
+    onCharacterReveal,
+    revealed,
+    visibleLength,
+  ])
+
   const isComplete = revealed || visibleLength >= line.length
   const visibleLine = revealed ? line : line.slice(0, visibleLength)
 
   const handleAdvance = () => {
     if (!isComplete) {
+      onTypingStop?.()
       setVisibleLength(line.length)
       setRevealed(true)
       return
     }
 
+    onTypingStop?.()
     onAdvance()
   }
 

@@ -105,6 +105,7 @@ function finishIntroWithEvents() {
 describe('DJ DOCHI fixed-room flow', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    localStorage.clear()
     const createObjectURL = vi.fn(() => 'blob:dochi-preview')
     vi.stubGlobal('URL', {
       createObjectURL,
@@ -127,6 +128,24 @@ describe('DJ DOCHI fixed-room flow', () => {
     expect(document.querySelector('.progress-rail')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'START SESSION' })).not.toBeInTheDocument()
     expect(screen.queryByText("Let's find your frequency")).not.toBeInTheDocument()
+  })
+
+  it('keeps independent BGM and dialogue SFX controls in the topbar without changing the room flow', () => {
+    render(<App />)
+
+    const bgmSettings = screen.getByRole('button', { name: '배경음악 설정 열기' })
+    const soundToggle = screen.getByRole('button', { name: '대화 효과음 끄기' })
+    expect(bgmSettings.closest('.topbar')).toBeInTheDocument()
+    expect(soundToggle.closest('.topbar')).toBeInTheDocument()
+
+    fireEvent.click(bgmSettings)
+    fireEvent.click(screen.getByRole('button', { name: '배경음악 끄기' }))
+    fireEvent.click(soundToggle)
+
+    expect(localStorage.getItem('dj-dochi:bgm-enabled')).toBe('false')
+    expect(screen.getByRole('button', { name: '대화 효과음 켜기' })).toBeInTheDocument()
+    expect(localStorage.getItem('dj-dochi:sfx-enabled')).toBe('false')
+    expect(screen.getByText('도치를 눌러보세요')).toBeInTheDocument()
   })
 
   it('uses the supplied idle character asset and keeps the controller in front', () => {

@@ -1,7 +1,11 @@
 import type { CSSProperties } from 'react'
+import bgmLoopUrl from '../assets/audio/dochi-workroom-loop.wav?url'
 import { DUMMY_MIXTAPE_RESULT } from '../data/playlist'
 import type { DochiPose } from '../types'
 import type { DjDochiFlow } from '../hooks/useDjDochiFlow'
+import { useBackgroundMusic } from '../hooks/useBackgroundMusic'
+import { useDochiVoice } from '../hooks/useDochiVoice'
+import BgmControl from './BgmControl'
 import ChoiceMenu from './ChoiceMenu'
 import CameraCapture from './CameraCapture'
 import DialogueBox from './DialogueBox'
@@ -18,6 +22,7 @@ import TasteAnalysisErrorPanel from './TasteAnalysisErrorPanel'
 import VinylInteraction from './VinylInteraction'
 import WorkshopEffects from './WorkshopEffects'
 import RetroButton from './RetroButton'
+import SoundToggle from './SoundToggle'
 
 type DochiRoomProps = {
   flow: DjDochiFlow
@@ -97,9 +102,27 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
     '--mix-energy': spinEnergy,
     '--mix-intensity': spinIntensity,
   } as CSSProperties
+  const voice = useDochiVoice({ state, dialogueKey })
+  const bgm = useBackgroundMusic({ audioUrl: bgmLoopUrl })
+
+  const noticeWithVoice = () => {
+    voice.unlock()
+    void bgm.unlockAndStart()
+    actions.notice()
+  }
 
   return (
-    <div className="app-shell dochi-room">
+    <div
+      className="app-shell dochi-room"
+      onPointerDownCapture={() => {
+        void bgm.unlockAndStart()
+      }}
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          void bgm.unlockAndStart()
+        }
+      }}
+    >
       <div className="ambient ambient--coral" aria-hidden="true" />
       <div className="ambient ambient--violet" aria-hidden="true" />
 
@@ -110,7 +133,16 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
             <span className="brand-lockup__name">DJ DOCHI</span>
             <span className="brand-lockup__tag">AI HEDGEHOG DJ</span>
           </div>
-          <div className="topbar__status"><span className="status-dot" aria-hidden="true" /> ROOM 01 / ON AIR</div>
+          <div className="topbar__controls">
+            <div className="topbar__status"><span className="status-dot" aria-hidden="true" /> ROOM 01 / ON AIR</div>
+            <BgmControl
+              enabled={bgm.enabled}
+              volume={bgm.volume}
+              onToggle={bgm.toggle}
+              onVolumeChange={bgm.setVolume}
+            />
+            <SoundToggle enabled={voice.enabled} onToggle={voice.toggle} />
+          </div>
         </header>
 
         <main
@@ -143,7 +175,7 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
               motion={getMotion(state)}
               visible={state !== 'leaving'}
               interactive={state === 'idle'}
-              onClick={actions.notice}
+              onClick={noticeWithVoice}
             />
           </div>
           <div className="room-controller-layer">
@@ -169,7 +201,19 @@ export default function DochiRoom({ flow }: DochiRoomProps) {
           {state === 'idle' && <span className="idle-hint">도치를 눌러보세요</span>}
 
           {dialogue && (
-            <DialogueBox line={dialogue.text} dialogueKey={dialogueKey} onAdvance={actions.advanceDialogue} />
+            <DialogueBox
+              line={dialogue.text}
+              dialogueKey={dialogueKey}
+              onAdvance={actions.advanceDialogue}
+              onCharacterReveal={(character, characterIndex, metadata) => {
+                voice.onCharacterReveal(character, characterIndex, metadata)
+                bgm.pulseDuck()
+              }}
+              onTypingStop={() => {
+                voice.stop()
+                bgm.releaseDuck()
+              }}
+            />
           )}
 
           {state === 'choosingInput' && !inputMode && (
