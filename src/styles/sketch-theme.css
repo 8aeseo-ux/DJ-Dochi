@@ -425,10 +425,17 @@ body {
 }
 
 .playlist-input-panel {
+  right: clamp(1.5rem, 4vw, 4.5rem);
+  padding: clamp(1rem, 3vw, 2rem);
   background: var(--sketch-paper-bright);
   border: var(--control-stroke) solid var(--sketch-ink);
   border-radius: 10px 7px 12px 8px / 8px 12px 7px 11px;
   box-shadow: 3px 4px 0 rgba(35, 34, 31, 0.08);
+}
+
+.taste-analysis-status {
+  margin: clamp(1.5rem, 3vw, 3rem);
+  padding: clamp(1rem, 3vw, 2rem);
 }
 
 .playlist-extraction-review,
@@ -1081,6 +1088,50 @@ select,
   font-family: var(--font-note);
 }
 
+/* Home composition polish: spacing and alignment only. */
+.room-stage:is(
+  .room-stage--idle,
+  .room-stage--noticed,
+  .room-stage--talking,
+  .room-stage--choosingInput
+) {
+  --home-space-1: 0.5rem;
+  --home-space-2: 1rem;
+  --home-space-3: 1.5rem;
+  --home-control-stack: 6.5rem;
+}
+
+.room-stage--idle .idle-hint {
+  bottom: 2rem;
+}
+
+.room-stage:is(
+  .room-stage--noticed,
+  .room-stage--talking,
+  .room-stage--choosingInput
+) .dialogue-box {
+  bottom: var(--home-space-3);
+  left: clamp(var(--home-space-2), 5%, 4.5rem);
+  width: min(48rem, 56%);
+  min-height: var(--home-control-stack);
+  padding: var(--home-space-2) var(--home-space-3);
+}
+
+.room-stage--choosingInput .choice-menu {
+  right: clamp(var(--home-space-2), 5%, 4.5rem);
+  bottom: var(--home-space-3);
+  width: min(22rem, 32%);
+  min-height: var(--home-control-stack);
+  gap: var(--home-space-1);
+  padding: 0;
+}
+
+.room-stage--choosingInput .choice-menu .retro-button {
+  min-height: 3rem;
+  gap: var(--home-space-2);
+  padding: 0.75rem var(--home-space-2);
+}
+
 button:focus-visible,
 textarea:focus-visible,
 input:focus-visible,
@@ -1093,6 +1144,18 @@ a:focus-visible,
 @media (max-width: 760px) {
   .app-shell {
     background: var(--sketch-paper);
+  }
+
+  .playlist-input-panel {
+    --panel-safe-space: clamp(1.5rem, 6vw, 2rem);
+
+    inset: var(--panel-safe-space);
+    width: auto;
+    max-height: calc(100% - (var(--panel-safe-space) * 2));
+  }
+
+  .taste-analysis-status {
+    margin: clamp(1.5rem, 6vw, 2rem);
   }
 
   .stage-frame {
@@ -1112,6 +1175,27 @@ a:focus-visible,
   .room-stage::after {
     inset: 3.9rem 0.2rem 1.4rem;
     opacity: 0.37;
+  }
+
+  .room-stage:is(
+    .room-stage--noticed,
+    .room-stage--talking,
+    .room-stage--choosingInput
+  ) .dialogue-box {
+    right: var(--home-space-2);
+    bottom: var(--home-space-2);
+    left: var(--home-space-2);
+    width: auto;
+    min-height: 7rem;
+    padding: var(--home-space-2);
+  }
+
+  .room-stage--choosingInput .choice-menu {
+    right: var(--home-space-2);
+    bottom: 8.5rem;
+    left: var(--home-space-2);
+    width: auto;
+    min-height: var(--home-control-stack);
   }
 }
 

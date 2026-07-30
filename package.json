@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "dev:vercel": "vercel dev",
+    "dev:vercel": "node scripts/local-vercel-dev.mjs",
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest"
