@@ -192,6 +192,11 @@ export function useDjDochiFlow(): DjDochiFlow {
     file: File,
     extractorId: PlaylistExtractorId = 'openai-vision',
   ) => {
+    if (
+      extractionControllerRef.current
+      && !extractionControllerRef.current.signal.aborted
+    ) return
+
     extractionControllerRef.current?.abort()
     const controller = new AbortController()
     extractionControllerRef.current = controller

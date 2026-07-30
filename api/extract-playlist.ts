@@ -103,8 +103,34 @@ export default {
     }
 
     try {
-      const result = await extractPlaylistWithOpenAI(image, apiKey, model)
-      return json(result)
+      const requestId = crypto.randomUUID()
+      const extractAttempt = (attempt: number) => extractPlaylistWithOpenAI(
+        image,
+        apiKey,
+        model,
+        {
+          analysisMethod: 'openai-vision',
+          attempt,
+          requestId,
+          signal: request.signal,
+        },
+      )
+      const firstResult = await extractAttempt(1)
+
+      if (firstResult.tracks.length > 1 || request.signal.aborted) {
+        return json(firstResult)
+      }
+
+      try {
+        const retryResult = await extractAttempt(2)
+        return json(
+          retryResult.tracks.length > firstResult.tracks.length
+            ? retryResult
+            : firstResult,
+        )
+      } catch {
+        return json(firstResult)
+      }
     } catch (error) {
       const issue: PlaylistAnalysisIssue = error instanceof PlaylistAnalysisError
         ? { code: error.code, message: error.message, retryable: error.retryable }

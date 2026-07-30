@@ -334,6 +334,31 @@ describe('useDjDochiFlow', () => {
     expect(result.current.mixtapeResult).toEqual(MIXTAPE_RESULT)
   })
 
+  it('ignores a duplicate image handoff while the first extraction is still running', async () => {
+    let resolveExtraction: ((value: typeof EXTRACTION_RESULT) => void) | undefined
+    extractPlaylistMock.mockReturnValue(new Promise((resolve) => {
+      resolveExtraction = resolve
+    }))
+    const { result } = renderHook(() => useDjDochiFlow())
+    const file = new File(['playlist'], 'playlist.png', { type: 'image/png' })
+
+    advanceToInputChoices(result)
+    act(() => result.current.actions.chooseImage())
+    act(() => result.current.actions.selectImage(file))
+    act(() => {
+      result.current.actions.handoff()
+      result.current.actions.handoff()
+    })
+
+    expect(extractPlaylistMock).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveExtraction?.(EXTRACTION_RESULT)
+      await Promise.resolve()
+    })
+    expect(result.current.state).toBe('extractionReview')
+  })
+
   it('moves to extractionError and can explicitly retry with Vision', async () => {
     extractPlaylistMock
       .mockRejectedValueOnce(new PlaylistAnalysisError({

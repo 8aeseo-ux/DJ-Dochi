@@ -21,6 +21,13 @@ const RawExtractionSchema = z.object({
 
 type RawExtraction = z.infer<typeof RawExtractionSchema>
 
+export type PlaylistExtractionAttemptContext = {
+  analysisMethod: 'openai-vision'
+  attempt: number
+  requestId: string
+  signal?: AbortSignal
+}
+
 const EXTRACTION_PROMPT = `
 Analyze this playlist or music-library screenshot.
 
@@ -35,10 +42,33 @@ Return only information visibly present in the image:
 - If no readable tracks exist, return an empty tracks array and explain why in Korean warnings.
 `.trim()
 
-export function normalizeExtractionResult(raw: RawExtraction): PlaylistExtractionResult {
+function logExtractionAttempt(
+  context: PlaylistExtractionAttemptContext | undefined,
+  details: {
+    rawTrackCount: number
+    extractedTrackCount: number
+    warningCodes: string[]
+  },
+) {
+  if (!context) return
+
+  console.info({
+    event: 'playlist_extraction_attempt',
+    analysisMethod: context.analysisMethod,
+    attempt: context.attempt,
+    requestId: context.requestId,
+    ...details,
+  })
+}
+
+export function normalizeExtractionResult(
+  raw: RawExtraction,
+  context?: PlaylistExtractionAttemptContext,
+): PlaylistExtractionResult {
   const warnings = raw.warnings.map((warning) => warning.trim()).filter(Boolean)
   const seen = new Set<string>()
   let removedIncompleteTrack = false
+  let removedDuplicateTrack = false
 
   const tracks = raw.tracks.flatMap((track) => {
     const title = track.title.trim()
@@ -50,7 +80,10 @@ export function normalizeExtractionResult(raw: RawExtraction): PlaylistExtractio
     }
 
     const duplicateKey = `${title.toLocaleLowerCase()}\u0000${artist.toLocaleLowerCase()}`
-    if (seen.has(duplicateKey)) return []
+    if (seen.has(duplicateKey)) {
+      removedDuplicateTrack = true
+      return []
+    }
     seen.add(duplicateKey)
 
     return [{
@@ -70,40 +103,59 @@ export function normalizeExtractionResult(raw: RawExtraction): PlaylistExtractio
     warnings.push('읽을 수 있는 곡을 찾지 못했어요. 글자가 더 크게 보이는 이미지를 사용해주세요.')
   }
 
-  return {
+  const result = {
     sourceApp: raw.sourceApp?.trim() || null,
     tracks,
     warnings,
   }
+
+  const warningCodes = [
+    ...(raw.warnings.length > 0 ? ['MODEL_WARNING'] : []),
+    ...(removedIncompleteTrack ? ['INCOMPLETE_TRACK_REMOVED'] : []),
+    ...(removedDuplicateTrack ? ['DUPLICATE_TRACK_REMOVED'] : []),
+    ...(tracks.length === 0 ? ['NO_TRACKS_FOUND'] : []),
+    ...(tracks.length === 1 ? ['LOW_TRACK_COUNT'] : []),
+  ]
+  logExtractionAttempt(context, {
+    rawTrackCount: raw.tracks.length,
+    extractedTrackCount: tracks.length,
+    warningCodes,
+  })
+
+  return result
 }
 
 export async function extractPlaylistWithOpenAI(
   file: File,
   apiKey: string,
   model: string,
+  context?: PlaylistExtractionAttemptContext,
 ): Promise<PlaylistExtractionResult> {
   const imageBytes = Buffer.from(await file.arrayBuffer())
   const imageUrl = `data:${file.type};base64,${imageBytes.toString('base64')}`
   const client = new OpenAI({ apiKey, timeout: 40_000, maxRetries: 1 })
 
   try {
-    const response = await client.responses.parse({
-      model,
-      store: false,
-      reasoning: { effort: 'low' },
-      input: [
-        {
-          role: 'user',
-          content: [
-            { type: 'input_text', text: EXTRACTION_PROMPT },
-            { type: 'input_image', image_url: imageUrl, detail: 'original' },
-          ],
+    const response = await client.responses.parse(
+      {
+        model,
+        store: false,
+        reasoning: { effort: 'low' },
+        input: [
+          {
+            role: 'user',
+            content: [
+              { type: 'input_text', text: EXTRACTION_PROMPT },
+              { type: 'input_image', image_url: imageUrl, detail: 'original' },
+            ],
+          },
+        ],
+        text: {
+          format: zodTextFormat(RawExtractionSchema, 'playlist_extraction'),
         },
-      ],
-      text: {
-        format: zodTextFormat(RawExtractionSchema, 'playlist_extraction'),
       },
-    })
+      context?.signal ? { signal: context.signal } : undefined,
+    )
 
     if (!response.output_parsed) {
       throw new PlaylistAnalysisError({
@@ -113,14 +165,21 @@ export async function extractPlaylistWithOpenAI(
       })
     }
 
-    return normalizeExtractionResult(response.output_parsed)
+    return normalizeExtractionResult(response.output_parsed, context)
   } catch (error) {
-    if (error instanceof PlaylistAnalysisError) throw error
+    const issue = error instanceof PlaylistAnalysisError
+      ? error
+      : new PlaylistAnalysisError({
+          code: 'ANALYSIS_FAILED',
+          message: '이미지 분석 서비스에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
+          retryable: true,
+        }, { cause: error })
 
-    throw new PlaylistAnalysisError({
-      code: 'ANALYSIS_FAILED',
-      message: '이미지 분석 서비스에 연결하지 못했어요. 잠시 후 다시 시도해주세요.',
-      retryable: true,
-    }, { cause: error })
+    logExtractionAttempt(context, {
+      rawTrackCount: 0,
+      extractedTrackCount: 0,
+      warningCodes: [issue.code],
+    })
+    throw issue
   }
 }

@@ -16,6 +16,21 @@ const RESULT = {
   sourceApp: 'Spotify',
   tracks: [
     { id: 'track-001', title: 'Space Song', artist: 'Beach House', album: '', confidence: 0.98 },
+    { id: 'track-002', title: 'Myth', artist: 'Beach House', album: '', confidence: 0.96 },
+  ],
+  warnings: [],
+}
+
+const EMPTY_RESULT = {
+  sourceApp: null,
+  tracks: [],
+  warnings: ['읽을 수 있는 곡을 찾지 못했어요.'],
+}
+
+const SINGLE_TRACK_RESULT = {
+  sourceApp: null,
+  tracks: [
+    { id: 'track-001', title: 'Space Song', artist: 'Beach House', album: '', confidence: 0.98 },
   ],
   warnings: [],
 }
@@ -30,6 +45,7 @@ function createRequest(file?: File, method = 'POST') {
 describe('POST /api/extract-playlist', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    extractWithOpenAIMock.mockReset()
     process.env.OPENAI_API_KEY = 'test-api-key'
     process.env.OPENAI_VISION_MODEL = 'test-vision-model'
     process.env.VERCEL_URL = 'react-vite-typescript-tailwindcss-dj-abc123.vercel.app'
@@ -151,6 +167,44 @@ describe('POST /api/extract-playlist', () => {
     expect(receivedFile).toMatchObject({ name: file.name, type: file.type, size: file.size })
     expect(receivedApiKey).toBe('test-api-key')
     expect(receivedModel).toBe('test-vision-model')
+  })
+
+  it('retries one time when Vision returns no tracks and keeps the richer result', async () => {
+    extractWithOpenAIMock
+      .mockResolvedValueOnce(EMPTY_RESULT)
+      .mockResolvedValueOnce(RESULT)
+
+    const response = await handler.fetch(createRequest(
+      new File(['png'], 'playlist.png', { type: 'image/png' }),
+    ))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(RESULT)
+    expect(extractWithOpenAIMock).toHaveBeenCalledTimes(2)
+    expect(extractWithOpenAIMock.mock.calls[0][3]).toEqual(expect.objectContaining({
+      analysisMethod: 'openai-vision',
+      attempt: 1,
+      requestId: expect.any(String),
+    }))
+    expect(extractWithOpenAIMock.mock.calls[1][3]).toEqual(expect.objectContaining({
+      analysisMethod: 'openai-vision',
+      attempt: 2,
+      requestId: expect.any(String),
+    }))
+  })
+
+  it('retries a one-track result but keeps it when the retry is worse', async () => {
+    extractWithOpenAIMock
+      .mockResolvedValueOnce(SINGLE_TRACK_RESULT)
+      .mockResolvedValueOnce(EMPTY_RESULT)
+
+    const response = await handler.fetch(createRequest(
+      new File(['png'], 'playlist.png', { type: 'image/png' }),
+    ))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual(SINGLE_TRACK_RESULT)
+    expect(extractWithOpenAIMock).toHaveBeenCalledTimes(2)
   })
 
   it('returns a structured retryable error when analysis fails', async () => {
